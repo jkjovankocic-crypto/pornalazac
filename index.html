@@ -791,10 +791,11 @@
       <div class="field">
         <label>Broj rezultata</label>
         <select id="ig-count">
-          <option value="10">10 profila</option>
-          <option value="20" selected>20 profila</option>
-          <option value="30">30 profila</option>
+          <option value="20">20 profila</option>
+          <option value="30" selected>30 profila</option>
           <option value="50">50 profila</option>
+          <option value="75">75 profila</option>
+          <option value="100">100 profila</option>
         </select>
       </div>
     </div>
@@ -806,6 +807,15 @@
       <button class="pill-btn"        id="ig-filter-link"     onclick="setIgFilter('link',this)">Sa linkom</button>
       <button class="pill-btn"        id="ig-filter-typeform" onclick="setIgFilter('typeform',this)">Sa Formom</button>
       <button class="pill-btn"        id="ig-filter-neither"  onclick="setIgFilter('neither',this)">Bez linka</button>
+    </div>
+
+    <!-- Samo bez linka checkbox -->
+    <div style="display:flex;align-items:center;gap:0.6rem;padding:0.6rem 0.85rem;background:rgba(34,197,94,0.06);border:1px solid rgba(34,197,94,0.2);border-radius:9px;margin-bottom:0.85rem;">
+      <label class="chk" style="cursor:pointer;user-select:none;display:flex;align-items:center;gap:0.5rem;">
+        <input type="checkbox" id="ig-only-no-link" style="accent-color:#22c55e;width:15px;height:15px;" />
+        <span style="font-size:0.85rem;color:var(--text);font-weight:600;">🎯 Samo profili BEZ linka</span>
+      </label>
+      <span style="font-size:0.75rem;color:var(--muted);margin-left:auto;">Prikazuje samo potencijalne klijente kojima možeš prodati sajt</span>
     </div>
 
     <button class="btn-ig-search" id="ig-search-btn" onclick="startIgSearch()">🔍 Pretraži Instagram profile →</button>
@@ -1864,30 +1874,37 @@ function buildIgSearchQueries(nicheConfig, niche, location, count) {
   const terms   = nicheConfig.searchTerms;
   const tags    = nicheConfig.hashtagTerms || [];
 
-  // ── A) Direktna pretraga profila sa nišom ──
-  for (const term of terms.slice(0, 3)) {
+  // ── A) Direktna pretraga profila — svaki search term posebno ──
+  for (const term of terms) {
     queries.push(`site:instagram.com "${term}" ${location}`);
   }
 
-  // ── B) Pretraga sa link-in-bio signalima ──
-  queries.push(`site:instagram.com "${terms[0]}" ${location} "link in bio" OR linktr.ee OR typeform`);
-
-  // ── C) Hashtag stranice — Instagram explore/tags vraća profile koji su koristili tag ──
-  // SerpAPI može da indeksira instagram.com/explore/tags/ stranice
-  for (const tag of tags.slice(0, 4)) {
-    queries.push(`site:instagram.com/explore/tags "${tag}" ${location}`);
-  }
-
-  // ── D) Hashtag direktno u Google pretrazi ──
-  for (const tag of tags.slice(0, 3)) {
-    queries.push(`instagram.com "#${tag}" ${location} -site:facebook.com -site:twitter.com`);
-  }
-
-  // ── E) Šira pretraga bez navodnika za više rezultata ──
+  // ── B) Varijante bez navodnika — širi ulov ──
+  queries.push(`site:instagram.com ${terms[0]} ${location} -gym -teretana -centar -studio -club`);
   if (terms.length > 1) {
-    queries.push(`site:instagram.com ${terms[1]} ${location} -gym -teretana -centar -klub`);
+    queries.push(`site:instagram.com ${terms[1]} ${location} -gym -teretana -centar -studio`);
   }
-  queries.push(`site:instagram.com ${niche} ${location} personal -gym -studio -centar`);
+
+  // ── C) Hashtag upiti — Google indeksira IG posts sa tagovima ──
+  // Koristimo hashtag kao search term na instagram.com (ne explore/tags koji ne radi)
+  for (const tag of tags.slice(0, 5)) {
+    queries.push(`site:instagram.com "#${tag}" ${location}`);
+  }
+
+  // ── D) Hashtag bez location za više rezultata ──
+  for (const tag of tags.slice(0, 3)) {
+    queries.push(`site:instagram.com "#${tag}"`);
+  }
+
+  // ── E) Pretraga sa ključnim riječima iz bio-a koje imaju treneri ──
+  const bioHints = ['online trening', 'online coaching', 'transformacija tela', 'gubljenje kilograma', 'personalni trening'];
+  for (const hint of bioHints.slice(0, 3)) {
+    queries.push(`site:instagram.com "${hint}" ${location}`);
+  }
+
+  // ── F) Pretraga sa "PT" skraćenicom ──
+  queries.push(`site:instagram.com "PT" trener ${location}`);
+  queries.push(`site:instagram.com "certified trainer" ${location}`);
 
   return queries;
 }
@@ -2027,6 +2044,7 @@ async function startIgSearch() {
   const city     = $('ig-city').value.trim();
   const location = city ? `${city}, ${countryName}` : countryName;
   const count    = parseInt($('ig-count').value);
+  const onlyNoLink = $('ig-only-no-link').checked;
 
   if (!niche) { igShowAlert('⚠️ Unesi nišu.', 'warning'); return; }
 
@@ -2049,7 +2067,7 @@ async function startIgSearch() {
     // Generiši specifične upite za ovu nišu
     const queries = buildIgSearchQueries(nicheConfig, niche, location, count);
     let pagesDone = 0;
-    const totalSteps = queries.length * 2; // max 2 stranice po upitu
+    const totalSteps = queries.length * 2;
 
     for (const q of queries) {
       if (profiles.length >= count) break;
@@ -2136,6 +2154,13 @@ async function startIgSearch() {
 
           const formUrl     = detectForm(allText);
           const externalUrl = formUrl || detectLink(allText);
+          const category    = classifyProfile({ externalUrl, formUrl });
+
+          // ── FILTER 3: Samo bez linka (ako je checkbox uključen) ──
+          if (onlyNoLink && (externalUrl || formUrl)) {
+            skippedIrrelevant++;
+            continue;
+          }
 
           // Ako je linktr.ee — fetch linkovi
           let linktreeLinks = [];
@@ -2146,6 +2171,8 @@ async function startIgSearch() {
             const ltForm  = detectForm(ltText);
             const ltLink  = detectLink(ltText);
             const enriched = ltForm || ltLink || externalUrl;
+            // Ako onlyNoLink i linktree ima link — preskoči
+            if (onlyNoLink && enriched) { skippedIrrelevant++; continue; }
             profiles.push({
               username, displayName,
               igUrl: `https://www.instagram.com/${username}/`,
@@ -2158,22 +2185,30 @@ async function startIgSearch() {
               nicheMatch: true,
             });
           } else {
-            profiles.push({
-              username, displayName,
-              igUrl: `https://www.instagram.com/${username}/`,
-              bio, externalUrl, formUrl,
-              linktreeUrl: '', linktreeLinks: [],
-              category: classifyProfile({ externalUrl, formUrl }),
-              nicheMatch: true,
-            });
+            // ── onlyNoLink filter za profile bez linktree ──
+            if (onlyNoLink && externalUrl) {
+              // već preskočen gore, ovo je fallback — ne treba ništa
+            } else {
+              profiles.push({
+                username, displayName,
+                igUrl: `https://www.instagram.com/${username}/`,
+                bio, externalUrl, formUrl,
+                linktreeUrl: '', linktreeLinks: [],
+                category: classifyProfile({ externalUrl, formUrl }),
+                nicheMatch: true,
+              });
+            }
           }
 
           if (profiles.length >= count) break;
         }
         pagesDone++;
-        // Ako nema rezultata na prvoj stranici, preskoči drugu za taj upit
-        if (start === 0 && (data.organic_results || []).filter(r => r.link?.includes('instagram.com/')).length < 3) break;
-        await sleep(400);
+        // Nastavi na drugu stranicu samo ako je prva imala bar 1 IG link
+        const igLinksOnPage = (data.organic_results || []).filter(r =>
+          r.link?.includes('instagram.com/') && !r.link.includes('/explore/') && !r.link.includes('/p/')
+        ).length;
+        if (start === 0 && igLinksOnPage === 0) break; // 0 profila na prvoj str → preskoči drugu
+        await sleep(350);
       }
     }
 
