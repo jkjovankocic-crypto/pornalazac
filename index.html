@@ -1,0 +1,2233 @@
+<!DOCTYPE html>
+<html lang="sr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pronalazač Klijenata — Firme bez sajta</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #0a0a0f;
+      --surface:  #111118;
+      --border:   rgba(255,255,255,0.08);
+      --text:     #f0f0f5;
+      --muted:    #8888a0;
+      --accent:   #7c6af7;
+      --accent2:  #a78bfa;
+      --green:    #22c55e;
+      --red:      #ef4444;
+      --yellow:   #eab308;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      font-size: 15px;
+      line-height: 1.6;
+    }
+
+    /* ── NAV ── */
+    nav {
+      border-bottom: 1px solid var(--border);
+      padding: 0 2rem;
+      height: 56px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky; top: 0; z-index: 50;
+      background: rgba(10,10,15,0.85);
+      backdrop-filter: blur(12px);
+    }
+    .nav-logo {
+      font-weight: 800; font-size: 1rem; color: var(--text);
+      text-decoration: none; letter-spacing: -0.3px;
+    }
+    .nav-logo span { color: var(--accent2); }
+
+    /* mode switcher */
+    .mode-switcher {
+      display: flex; gap: 4px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid var(--border);
+      border-radius: 10px; padding: 3px;
+    }
+    .mode-btn {
+      background: transparent; color: var(--muted);
+      border: none; border-radius: 7px;
+      padding: 0.4rem 1rem; font-size: 0.82rem; font-weight: 600;
+      cursor: pointer; font-family: inherit;
+      transition: all 0.18s; white-space: nowrap;
+    }
+    .mode-btn.active {
+      background: var(--surface);
+      color: var(--text);
+      box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+    }
+
+    /* ── HERO ── */
+    .hero {
+      text-align: center;
+      padding: 5rem 1.5rem 3rem;
+      max-width: 760px;
+      margin: 0 auto;
+    }
+    .hero-badge {
+      display: inline-flex; align-items: center; gap: 0.4rem;
+      background: rgba(124,106,247,0.12);
+      border: 1px solid rgba(124,106,247,0.25);
+      color: var(--accent2); border-radius: 999px;
+      padding: 0.3rem 0.9rem; font-size: 0.75rem; font-weight: 600;
+      letter-spacing: 0.05em; text-transform: uppercase;
+      margin-bottom: 1.5rem;
+    }
+    .hero h1 {
+      font-size: clamp(2rem, 5vw, 3.2rem);
+      font-weight: 800; line-height: 1.15;
+      letter-spacing: -1.5px; margin-bottom: 1rem;
+    }
+    .hero h1 span {
+      background: linear-gradient(135deg, #a78bfa, #7c6af7, #6366f1);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+    .hero p {
+      color: var(--muted); font-size: 1.05rem;
+      max-width: 520px; margin: 0 auto 2.5rem;
+    }
+
+    /* ── BADGES ROW ── */
+    .badges {
+      display: flex; flex-wrap: wrap; justify-content: center; gap: 0.5rem;
+      margin-bottom: 2.5rem;
+    }
+    .badge {
+      display: inline-flex; align-items: center; gap: 0.3rem;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 999px; padding: 0.3rem 0.85rem;
+      font-size: 0.75rem; font-weight: 500; color: var(--muted);
+    }
+    .badge .dot {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: var(--green); flex-shrink: 0;
+    }
+
+    /* ── SEARCH CARD ── */
+    .search-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 2rem;
+      max-width: 760px;
+      margin: 0 auto 1.5rem;
+    }
+
+    /* source tabs */
+    .source-tabs {
+      display: flex; gap: 6px; margin-bottom: 1.5rem;
+      background: var(--bg); border-radius: 10px; padding: 4px;
+      border: 1px solid var(--border);
+    }
+    .src-btn {
+      flex: 1; background: transparent; color: var(--muted);
+      border: none; border-radius: 7px;
+      padding: 0.5rem 0.75rem; font-size: 0.82rem; font-weight: 600;
+      cursor: pointer; font-family: inherit; text-align: center;
+      transition: all 0.18s;
+    }
+    .src-btn.active {
+      background: rgba(124,106,247,0.18);
+      color: var(--accent2);
+      box-shadow: inset 0 0 0 1px rgba(124,106,247,0.3);
+    }
+
+    /* inputs grid */
+    .inputs-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.85rem;
+      margin-bottom: 0.85rem;
+    }
+    .inputs-grid.single { grid-template-columns: 1fr; }
+
+    .field { display: flex; flex-direction: column; gap: 0.35rem; }
+    .field label { font-size: 0.78rem; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+    .field input, .field select {
+      background: var(--bg); color: var(--text);
+      border: 1px solid var(--border); border-radius: 9px;
+      padding: 0.7rem 0.9rem; font-size: 0.92rem;
+      outline: none; font-family: inherit; width: 100%;
+      transition: border-color 0.18s;
+    }
+    .field input:focus, .field select:focus { border-color: rgba(124,106,247,0.5); }
+    .field input::placeholder { color: #555566; }
+    .field select option { background: #111118; }
+
+    /* key row */
+    .key-row {
+      display: flex; gap: 0.5rem; align-items: stretch;
+    }
+    .key-row input { flex: 1; }
+    .btn-save {
+      background: rgba(124,106,247,0.15);
+      border: 1px solid rgba(124,106,247,0.3);
+      color: var(--accent2); border-radius: 9px;
+      padding: 0 1rem; font-size: 0.82rem; font-weight: 600;
+      cursor: pointer; font-family: inherit; white-space: nowrap;
+      transition: background 0.18s;
+    }
+    .btn-save:hover { background: rgba(124,106,247,0.25); }
+    .key-status { font-size: 0.75rem; color: var(--green); margin-top: 0.2rem; }
+
+    /* source options */
+    #serpapi-opts, #outscraper-opts { display: none; margin-bottom: 0.85rem; }
+
+    /* extra opts row */
+    .opts-row {
+      display: flex; flex-wrap: wrap; gap: 0.85rem;
+      margin-bottom: 0.85rem; align-items: flex-end;
+    }
+    .opts-row .field { flex: 1; min-width: 140px; }
+
+    /* filters row */
+    .filters-row {
+      display: flex; flex-wrap: wrap; gap: 1rem;
+      padding: 0.85rem 1rem;
+      background: var(--bg); border-radius: 9px;
+      border: 1px solid var(--border);
+      margin-bottom: 0.85rem;
+    }
+    .chk {
+      display: flex; align-items: center; gap: 0.45rem;
+      font-size: 0.82rem; color: var(--muted); cursor: pointer;
+      user-select: none;
+    }
+    .chk input { accent-color: var(--accent2); width: 14px; height: 14px; cursor: pointer; }
+    .chk:hover { color: var(--text); }
+
+    /* instagram toggle */
+    .ig-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0.7rem 1rem;
+      background: var(--bg); border-radius: 9px;
+      border: 1px solid var(--border);
+      margin-bottom: 0.85rem;
+    }
+    .ig-label { font-size: 0.85rem; color: var(--muted); }
+    .ig-label strong { color: var(--text); }
+    .ig-hint { font-size: 0.75rem; color: #666677; margin-top: 0.15rem; }
+
+    /* search button */
+    .btn-search {
+      width: 100%;
+      background: var(--accent);
+      color: #fff; border: none; border-radius: 10px;
+      padding: 0.85rem; font-size: 0.95rem; font-weight: 700;
+      cursor: pointer; font-family: inherit;
+      transition: opacity 0.18s, transform 0.18s;
+      letter-spacing: 0.01em;
+    }
+    .btn-search:hover  { opacity: 0.88; transform: translateY(-1px); }
+    .btn-search:active { transform: translateY(0); }
+    .btn-search:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+    /* ── ALERTS ── */
+    .alert {
+      padding: 0.7rem 1rem; border-radius: 9px;
+      font-size: 0.85rem; margin-top: 0.75rem;
+    }
+    .alert-warning { background:rgba(234,179,8,0.08);  color:#fde047; border:1px solid rgba(234,179,8,0.2); }
+    .alert-error   { background:rgba(239,68,68,0.08);  color:#fca5a5; border:1px solid rgba(239,68,68,0.2); }
+    .alert-success { background:rgba(34,197,94,0.08);  color:#86efac; border:1px solid rgba(34,197,94,0.2); }
+    .alert-info    { background:rgba(99,102,241,0.08); color:#a5b4fc; border:1px solid rgba(99,102,241,0.2); }
+
+    /* ── PROGRESS ── */
+    #status-box { display:none; margin-top:1rem; }
+    .prog-track {
+      background: var(--bg); border-radius:999px;
+      height: 4px; overflow:hidden; margin-bottom:0.4rem;
+    }
+    .prog-fill {
+      height:100%; width:0%;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      border-radius:999px; transition: width 0.2s;
+    }
+    #status-text { font-size:0.78rem; color:var(--muted); }
+
+    /* ── RESULTS SECTION ── */
+    .results-wrap {
+      max-width: 1100px; margin: 0 auto; padding: 0 1.5rem 4rem;
+    }
+
+    /* metrics */
+    .metrics {
+      display: flex; flex-wrap: wrap; gap: 0.75rem;
+      margin-bottom: 1.5rem;
+    }
+    .metric {
+      flex: 1; min-width: 110px;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 12px; padding: 1rem 1.25rem;
+    }
+    .metric-val {
+      font-size: 1.8rem; font-weight: 800; line-height: 1;
+      color: var(--accent2); letter-spacing: -1px;
+    }
+    .metric-lbl {
+      font-size: 0.72rem; color: var(--muted); margin-top: 0.3rem;
+      text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600;
+    }
+
+    /* tabs */
+    .tabs-bar {
+      display: flex; gap: 4px; margin-bottom: 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .tab-btn {
+      background: transparent; color: var(--muted);
+      border: none; padding: 0.6rem 1.2rem;
+      font-size: 0.85rem; font-weight: 600;
+      cursor: pointer; font-family: inherit;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -1px; transition: color 0.15s;
+    }
+    .tab-btn.active { color: var(--text); border-bottom-color: var(--accent); }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    /* table */
+    .table-wrap {
+      overflow-x: auto;
+      border: 1px solid var(--border);
+      border-top: none;
+      border-radius: 0 0 12px 12px;
+    }
+    table { width:100%; border-collapse:collapse; font-size:0.83rem; }
+    thead th {
+      background: #0d0d14; color: var(--muted);
+      text-align: left; padding: 0.7rem 1rem;
+      white-space: nowrap; font-weight: 600;
+      font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em;
+      border-bottom: 1px solid var(--border);
+    }
+    tbody tr { border-bottom: 1px solid rgba(255,255,255,0.04); transition: background 0.1s; }
+    tbody tr:hover { background: rgba(124,106,247,0.05); }
+    tbody td { padding: 0.6rem 1rem; color: #ccccd8; vertical-align: middle; }
+    tbody td a { color: var(--accent2); text-decoration: none; }
+    tbody td a:hover { text-decoration: underline; }
+    .stars { color: var(--yellow); font-size: 0.8rem; }
+    .reviews { color: var(--muted); font-size: 0.75rem; margin-left: 0.25rem; }
+    thead th.sortable { cursor: pointer; user-select: none; white-space: nowrap; }
+    thead th.sortable:hover { color: var(--text); }
+    thead th.sortable::after { content: ' ⇅'; color: #44445a; font-size: 0.68rem; }
+    thead th.sort-asc::after  { content: ' ↑'; color: var(--accent2); }
+    thead th.sort-desc::after { content: ' ↓'; color: var(--accent2); }
+
+    .tag {
+      display: inline-block;
+      background: rgba(124,106,247,0.1); color: var(--accent2);
+      border: 1px solid rgba(124,106,247,0.2);
+      border-radius: 5px; padding: 0.1rem 0.45rem;
+      font-size: 0.72rem; font-weight: 600;
+    }
+
+    /* map */
+    #map { height: 460px; border-radius: 0 0 12px 12px; border: 1px solid var(--border); border-top: none; }
+
+    /* csv */
+    .btn-csv {
+      margin-top: 1rem;
+      background: rgba(124,106,247,0.12);
+      border: 1px solid rgba(124,106,247,0.25);
+      color: var(--accent2); border-radius: 9px;
+      padding: 0.55rem 1.25rem; font-size: 0.85rem; font-weight: 600;
+      cursor: pointer; font-family: inherit; transition: background 0.18s;
+    }
+    .btn-csv:hover { background: rgba(124,106,247,0.22); }
+
+    /* ── INSTAGRAM HUNTER ── */
+    .ig-hunter-wrap {
+      max-width: 860px; margin: 3rem auto 0; padding: 0 1.5rem;
+    }
+    .section-divider {
+      display: flex; align-items: center; gap: 1rem;
+      margin-bottom: 2rem;
+    }
+    .section-divider::before, .section-divider::after {
+      content:''; flex:1; height:1px; background: var(--border);
+    }
+    .section-tag {
+      display: inline-flex; align-items: center; gap: 0.4rem;
+      background: rgba(236,72,153,0.1); border: 1px solid rgba(236,72,153,0.25);
+      color: #f472b6; border-radius: 999px;
+      padding: 0.3rem 1rem; font-size: 0.75rem; font-weight: 700;
+      letter-spacing: 0.05em; text-transform: uppercase; white-space: nowrap;
+    }
+    .ig-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 16px; padding: 2rem;
+    }
+    .ig-card h2 {
+      font-size: 1.4rem; font-weight: 800; letter-spacing: -0.5px;
+      margin-bottom: 0.4rem;
+    }
+    .ig-card h2 span {
+      background: linear-gradient(135deg,#f472b6,#a78bfa);
+      -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+    }
+    .ig-card p.desc { color: var(--muted); font-size: 0.88rem; margin-bottom: 1.5rem; }
+
+    .niche-grid {
+      display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1.25rem;
+    }
+    .niche-chip {
+      background: var(--bg); border: 1px solid var(--border);
+      color: var(--muted); border-radius: 999px;
+      padding: 0.35rem 0.85rem; font-size: 0.8rem; font-weight: 500;
+      cursor: pointer; font-family: inherit; transition: all 0.15s;
+      white-space: nowrap;
+    }
+    .niche-chip:hover { border-color: rgba(244,114,182,0.4); color: #f9a8d4; }
+    .niche-chip.active {
+      background: rgba(236,72,153,0.12);
+      border-color: rgba(236,72,153,0.4); color: #f472b6;
+    }
+
+    .ig-inputs { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 0.85rem; margin-bottom: 0.85rem; }
+    @media (max-width: 700px) { .ig-inputs { grid-template-columns: 1fr 1fr; } }
+
+    .filter-pills {
+      display: flex; gap: 0.5rem; flex-wrap: wrap;
+      padding: 0.75rem 1rem;
+      background: var(--bg); border-radius: 9px; border: 1px solid var(--border);
+      margin-bottom: 0.85rem;
+    }
+    .pill-btn {
+      background: transparent; border: 1px solid var(--border);
+      color: var(--muted); border-radius: 999px;
+      padding: 0.3rem 0.85rem; font-size: 0.78rem; font-weight: 600;
+      cursor: pointer; font-family: inherit; transition: all 0.15s;
+    }
+    .pill-btn.active {
+      background: rgba(244,114,182,0.12);
+      border-color: rgba(244,114,182,0.35); color: #f472b6;
+    }
+    .pill-btn:hover { border-color: rgba(244,114,182,0.3); color: #f9a8d4; }
+
+    .btn-ig-search {
+      width: 100%;
+      background: linear-gradient(135deg, #ec4899, #a78bfa);
+      color: #fff; border: none; border-radius: 10px;
+      padding: 0.85rem; font-size: 0.95rem; font-weight: 700;
+      cursor: pointer; font-family: inherit; transition: opacity 0.18s, transform 0.18s;
+    }
+    .btn-ig-search:hover { opacity: 0.88; transform: translateY(-1px); }
+    .btn-ig-search:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+    /* IG results */
+    #ig-results-section { margin-top: 1.75rem; }
+    .ig-metrics { display:flex; flex-wrap:wrap; gap:0.65rem; margin-bottom:1.25rem; }
+    .ig-metric {
+      flex:1; min-width:100px;
+      background: rgba(236,72,153,0.06); border: 1px solid rgba(236,72,153,0.15);
+      border-radius: 12px; padding: 0.8rem 1rem; text-align:center;
+    }
+    .ig-metric .metric-val { color: #f472b6; }
+
+    .ig-profiles-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 0.85rem;
+    }
+    .ig-profile-card {
+      background: var(--bg); border: 1px solid var(--border);
+      border-radius: 12px; padding: 1.1rem;
+      transition: border-color 0.15s;
+    }
+    .ig-profile-card:hover { border-color: rgba(244,114,182,0.35); }
+    .ig-profile-top {
+      display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.75rem;
+    }
+    .ig-avatar {
+      width: 42px; height: 42px; border-radius: 50%;
+      background: linear-gradient(135deg,#ec4899,#a78bfa);
+      display:flex; align-items:center; justify-content:center;
+      font-size: 1.1rem; flex-shrink:0;
+    }
+    .ig-username { font-weight: 700; font-size: 0.88rem; color: var(--text); }
+    .ig-handle { font-size: 0.75rem; color: var(--muted); }
+    .ig-bio {
+      font-size: 0.8rem; color: #aaaabc; line-height: 1.55;
+      margin-bottom: 0.75rem;
+      display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .ig-tags { display:flex; flex-wrap:wrap; gap:0.35rem; margin-bottom:0.75rem; }
+    .ig-tag {
+      font-size: 0.7rem; padding: 0.15rem 0.5rem; border-radius: 4px; font-weight: 600;
+    }
+    .ig-tag-link     { background:rgba(99,102,241,0.12); color:#a5b4fc; border:1px solid rgba(99,102,241,0.2); }
+    .ig-tag-typeform { background:rgba(236,72,153,0.12); color:#f9a8d4; border:1px solid rgba(236,72,153,0.2); }
+    .ig-tag-none     { background:rgba(255,255,255,0.05); color:var(--muted); border:1px solid var(--border); }
+    .ig-links { display:flex; gap:0.5rem; flex-wrap:wrap; }
+    .ig-link-btn {
+      font-size: 0.75rem; font-weight: 600; padding: 0.3rem 0.7rem;
+      border-radius: 6px; text-decoration: none; border: 1px solid;
+      cursor: pointer; font-family: inherit; background: transparent;
+      transition: background 0.15s;
+    }
+    .ig-link-btn.view { color:#a5b4fc; border-color:rgba(99,102,241,0.3); }
+    .ig-link-btn.view:hover { background:rgba(99,102,241,0.1); }
+    .ig-link-btn.ext  { color:#f9a8d4; border-color:rgba(236,72,153,0.3); }
+    .ig-link-btn.ext:hover  { background:rgba(236,72,153,0.1); }
+
+    /* key list row */
+    .key-item {
+      display: flex; align-items: center; gap: 0.6rem;
+      padding: 0.5rem 0.75rem;
+      background: var(--bg); border: 1px solid var(--border);
+      border-radius: 8px;
+    }
+    .key-item.active-key { border-color: rgba(34,197,94,0.35); }
+    .key-item.exhausted-key { border-color: rgba(239,68,68,0.3); opacity: 0.6; }
+    .key-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+    .key-dot-active    { background: var(--green); box-shadow:0 0 6px rgba(34,197,94,0.5); }
+    .key-dot-exhausted { background: #ef4444; }
+    .key-dot-idle      { background: #555566; }
+    .key-label { flex:1; font-size:0.8rem; color:var(--muted); font-family:monospace; }
+    .key-credits { font-size:0.75rem; color:var(--muted); white-space:nowrap; }
+    .key-del {
+      background:none; border:none; color:#555566; cursor:pointer;
+      font-size:1rem; padding:0 0.2rem; line-height:1;
+      transition:color 0.15s;
+    }
+    .key-del:hover { color:#ef4444; }
+    .token-stat {
+      display:inline-flex; align-items:center; gap:0.3rem;
+      font-size:0.75rem; color:var(--muted);
+    }
+    .token-stat strong { color:var(--accent2); }
+
+    /* ── FOOTER ── */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 1.5rem; text-align: center;
+      color: var(--muted); font-size: 0.78rem;
+    }
+
+    /* ── RESPONSIVE ── */
+    @media (max-width: 640px) {
+      .inputs-grid { grid-template-columns: 1fr; }
+      .hero h1 { font-size: 1.9rem; }
+      .hero { padding: 3rem 1rem 2rem; }
+      .search-card { padding: 1.25rem; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <a href="#" class="nav-logo">Pronalazač<span>Klijenata</span></a>
+  <div class="mode-switcher">
+    <button class="mode-btn active" id="mode-leads" onclick="setMode('leads')">🏢 Lead Scraper</button>
+    <button class="mode-btn"        id="mode-ig"    onclick="setMode('ig')">📸 Instagram Hunter</button>
+    <button class="mode-btn"        id="mode-keys"  onclick="setMode('keys')">🔑 API Ključevi</button>
+  </div>
+  <span style="font-size:0.75rem;color:var(--muted);">🆓 Besplatno</span>
+</nav>
+
+<!-- ══ MODE: LEAD SCRAPER ══ -->
+<div id="mode-leads-view">
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-badge"><span class="dot" style="width:6px;height:6px;border-radius:50%;background:var(--green);display:inline-block;"></span> Besplatni alat za pronalaženje klijenata</div>
+  <h1>Pronađi firme bez sajta<br/><span>u bilo kom gradu</span></h1>
+  <p>Koristi ovaj alat da pronađeš lokalne firme koje nemaju veb sajt i pretvori ih u potencijalne klijente za izradu sajtova.</p>
+  <div class="badges">
+    <span class="badge"><span class="dot"></span> Live OSM podaci</span>
+    <span class="badge"><span class="dot"></span> Bez API ključa</span>
+    <span class="badge"><span class="dot"></span> Export CSV</span>
+    <span class="badge"><span class="dot"></span> Interaktivna mapa</span>
+    <span class="badge"><span class="dot" style="background:var(--accent2);"></span> SerpAPI Google Maps</span>
+    <span class="badge"><span class="dot" style="background:var(--accent2);"></span> Outscraper</span>
+  </div>
+</section>
+
+<!-- SEARCH CARD -->
+<div style="padding: 0 1.5rem; max-width:760px; margin:0 auto;">
+<div class="search-card">
+
+  <!-- Source tabs -->
+  <div class="source-tabs">
+    <button class="src-btn active" data-src="osm"        onclick="setSource('osm',this)">🌍 OpenStreetMap</button>
+    <button class="src-btn"        data-src="serpapi"    onclick="setSource('serpapi',this)">🔎 SerpAPI</button>
+    <button class="src-btn"        data-src="outscraper" onclick="setSource('outscraper',this)">🛰️ Outscraper</button>
+  </div>
+
+  <!-- SerpAPI key -->
+  <div id="serpapi-opts">
+    <div class="opts-row">
+      <div class="field">
+        <label>Broj stranica (×20)</label>
+        <select id="max-pages">
+          <option value="1">1 (20 res.)</option>
+          <option value="2">2 (40 res.)</option>
+          <option value="3" selected>3 (60 res.)</option>
+          <option value="5">5 (100 res.)</option>
+          <option value="10">10 (200 res.)</option>
+        </select>
+      </div>
+    </div>
+    <div id="serpapi-key-notice" class="hint" style="color:var(--muted);margin-bottom:0.5rem;">
+      🔑 Ključevi se podešavaju u <button onclick="setMode('keys')" style="background:none;border:none;color:var(--accent2);cursor:pointer;font-size:inherit;padding:0;font-family:inherit;font-weight:600;">API Ključevi →</button>
+    </div>
+    <div id="serpapi-keys-status-bar" style="font-size:0.75rem;color:var(--green);"></div>
+  </div>
+
+  <!-- Outscraper key -->
+  <div id="outscraper-opts">
+    <div class="opts-row">
+      <div class="field">
+        <label>Limit rezultata</label>
+        <select id="oc-limit">
+          <option value="20">20</option>
+          <option value="50">50</option>
+          <option value="100" selected>100</option>
+          <option value="200">200</option>
+          <option value="400">400</option>
+        </select>
+      </div>
+    </div>
+    <div class="hint" style="color:var(--muted);margin-bottom:0.5rem;">
+      🔑 Ključevi se podešavaju u <button onclick="setMode('keys')" style="background:none;border:none;color:var(--accent2);cursor:pointer;font-size:inherit;padding:0;font-family:inherit;font-weight:600;">API Ključevi →</button>
+    </div>
+    <div id="outscraper-keys-status-bar" style="font-size:0.75rem;color:var(--green);"></div>
+  </div>
+
+  <!-- Main inputs -->
+  <div class="inputs-grid">
+    <div class="field">
+      <label>Tip firme</label>
+      <select id="preset" onchange="onPresetChange()">
+        <option value="hairdresser">💇 Frizer</option>
+        <option value="restaurant">🍽️ Restoran</option>
+        <option value="cafe_bar">☕ Kafić / Kafana</option>
+        <option value="bakery">🥖 Pekara</option>
+        <option value="pharmacy">💊 Apoteka</option>
+        <option value="dentist">🦷 Zubar</option>
+        <option value="car_repair">🔧 Auto servis</option>
+        <option value="fitness">💪 Teretana</option>
+        <option value="beauty">💅 Kozmetički salon</option>
+        <option value="hotel">🏨 Hotel / Smeštaj</option>
+        <option value="shop">🛍️ Prodavnica (opšte)</option>
+        <option value="doctors">🏥 Lekar / Klinika</option>
+        <option value="lawyer">⚖️ Advokat</option>
+        <option value="florist">🌸 Cvećara</option>
+        <option value="optician">👓 Optika</option>
+        <option value="veterinary">🐾 Veterinar</option>
+        <option value="custom">✏️ Slobodan unos</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Grad / Lokacija</label>
+      <input type="text" id="location" placeholder="npr. Beograd, Novi Sad..." />
+    </div>
+  </div>
+
+  <div id="custom-row" style="display:none; margin-bottom:0.85rem;">
+    <div class="field">
+      <label>Ključna reč</label>
+      <input type="text" id="custom-text" placeholder="npr. pizza, frizerski salon, servis..." />
+    </div>
+  </div>
+
+  <!-- Filters -->
+  <div class="filters-row">
+    <label class="chk"><input type="checkbox" id="f-no-website" checked /> Samo BEZ sajta</label>
+    <label class="chk"><input type="checkbox" id="f-with-phone" /> Samo sa telefonom</label>
+    <label class="chk"><input type="checkbox" id="f-with-address" /> Samo sa adresom</label>
+    <div class="field" style="margin-left:auto;">
+      <select id="max-results" style="padding:0.35rem 0.6rem; font-size:0.78rem;">
+        <option value="50">Max 50</option>
+        <option value="100">Max 100</option>
+        <option value="200" selected>Max 200</option>
+        <option value="500">Max 500</option>
+        <option value="1000">Max 1000</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- Instagram -->
+  <div class="ig-row">
+    <div>
+      <div class="ig-label"><strong>📸 Instagram pretraga</strong></div>
+      <div class="ig-hint">Traži Instagram profil za svaku firmu (koristi SerpAPI — 1 upit/firmi)</div>
+    </div>
+    <label class="chk"><input type="checkbox" id="find-instagram" /></label>
+  </div>
+
+  <!-- Search btn -->
+  <button class="btn-search" id="search-btn" onclick="startSearch()">Pronađi klijente →</button>
+  <div id="alert-box"></div>
+  <div id="token-counter" style="display:none; margin-top:0.6rem; font-size:0.78rem; color:var(--muted); display:flex; gap:1.5rem; flex-wrap:wrap;"></div>
+
+  <!-- Progress -->
+  <div id="status-box">
+    <div class="prog-track"><div class="prog-fill" id="prog-fill"></div></div>
+    <p id="status-text">Učitavanje...</p>
+  </div>
+
+</div>
+</div>
+
+<!-- RESULTS -->
+<div class="results-wrap" id="results-section" style="display:none; margin-top:2.5rem;">
+
+  <div class="metrics" id="metrics-row">
+    <div class="metric"><div class="metric-val" id="m-total">0</div><div class="metric-lbl">Ukupno</div></div>
+    <div class="metric"><div class="metric-val" id="m-phone">0</div><div class="metric-lbl">Sa telefonom</div></div>
+    <div class="metric"><div class="metric-val" id="m-address">0</div><div class="metric-lbl">Sa adresom</div></div>
+    <div class="metric"><div class="metric-val" id="m-nosite">0</div><div class="metric-lbl">Bez sajta</div></div>
+    <div class="metric"><div class="metric-val" id="m-email">0</div><div class="metric-lbl">Sa emailom</div></div>
+    <div class="metric" id="m-ig-card" style="display:none;"><div class="metric-val" id="m-ig">0</div><div class="metric-lbl">Instagram</div></div>
+  </div>
+
+  <div id="results-alert"></div>
+
+  <div class="tabs-bar" style="margin-top:1rem;">
+    <button class="tab-btn active" onclick="switchTab('table',this)">Tabela</button>
+    <button class="tab-btn"        onclick="switchTab('map',this)">Mapa</button>
+  </div>
+
+  <div class="tab-panel active" id="tab-table">
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th class="sortable" onclick="sortTable('naziv')">Naziv</th>
+            <th>Telefon</th>
+            <th>Email</th>
+            <th>Adresa</th>
+            <th class="sortable" onclick="sortTable('tip')">Tip</th>
+            <th class="sortable" onclick="sortTable('ocena')">Ocena</th>
+            <th class="sortable" onclick="sortTable('reviews')">Recenzije</th>
+            <th>Sajt</th><th>Instagram</th><th>Mapa</th>
+          </tr>
+        </thead>
+        <tbody id="results-body"></tbody>
+      </table>
+    </div>
+    <button class="btn-csv" onclick="downloadCSV()">⬇ Preuzmi CSV</button>
+  </div>
+
+  <div class="tab-panel" id="tab-map">
+    <div id="map"></div>
+  </div>
+</div><!-- /results-wrap -->
+
+</div><!-- /mode-leads-view -->
+
+<!-- ══ MODE: INSTAGRAM HUNTER ══ -->
+<div id="mode-ig-view" style="display:none;">
+<!-- ══════════════ INSTAGRAM HUNTER ══════════════ -->
+<div class="ig-hunter-wrap">
+  <div class="section-divider">
+    <span class="section-tag">📸 Instagram Hunter</span>
+  </div>
+
+  <div class="ig-card">
+    <h2>Pronađi Instagram profile <span>po niši i državi</span></h2>
+    <p class="desc">Pretražuje Google (via SerpAPI) i pronalazi Instagram profile — izvlači bio, link i Typeform iz opisa profila.</p>
+
+    <!-- Niche chips -->
+    <div style="font-size:0.75rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.6rem;">Izaberi nišu</div>
+    <div class="niche-grid" id="niche-grid">
+      <button class="niche-chip active" data-niche="fitness trainer">💪 Fitness trener</button>
+      <button class="niche-chip" data-niche="personal trainer">🏋️ Personal trener</button>
+      <button class="niche-chip" data-niche="life coach">🧠 Life coach</button>
+      <button class="niche-chip" data-niche="nutritionist">🥗 Nutricionist</button>
+      <button class="niche-chip" data-niche="yoga instructor">🧘 Yoga instruktor</button>
+      <button class="niche-chip" data-niche="business coach">💼 Business coach</button>
+      <button class="niche-chip" data-niche="photographer">📷 Fotograf</button>
+      <button class="niche-chip" data-niche="makeup artist">💄 Makeup artist</button>
+      <button class="niche-chip" data-niche="real estate agent">🏠 Nekretnine</button>
+      <button class="niche-chip" data-niche="dentist">🦷 Zubar</button>
+      <button class="niche-chip" data-niche="therapist">🩺 Terapeut</button>
+      <button class="niche-chip" data-niche="interior designer">🛋️ Enterijer</button>
+      <button class="niche-chip" data-niche="custom">✏️ Slobodan unos</button>
+    </div>
+
+    <div class="ig-inputs">
+      <div class="field" id="ig-custom-field" style="display:none;">
+        <label>Niša (slobodan unos)</label>
+        <input type="text" id="ig-custom-niche" placeholder="npr. wedding planner..." />
+      </div>
+      <div class="field">
+        <label>Država / Region</label>
+        <select id="ig-country">
+          <option value="rs|sr">🇷🇸 Srbija</option>
+          <option value="hr|hr">🇭🇷 Hrvatska</option>
+          <option value="ba|bs">🇧🇦 BiH</option>
+          <option value="si|sl">🇸🇮 Slovenija</option>
+          <option value="me|sr">🇲🇪 Crna Gora</option>
+          <option value="us|en">🇺🇸 SAD</option>
+          <option value="gb|en">🇬🇧 Velika Britanija</option>
+          <option value="de|de">🇩🇪 Nemačka</option>
+          <option value="au|en">🇦🇺 Australija</option>
+          <option value="ca|en">🇨🇦 Kanada</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Grad (opciono)</label>
+        <input type="text" id="ig-city" placeholder="npr. Beograd, London..." />
+      </div>
+      <div class="field">
+        <label>Broj rezultata</label>
+        <select id="ig-count">
+          <option value="10">10 profila</option>
+          <option value="20" selected>20 profila</option>
+          <option value="30">30 profila</option>
+          <option value="50">50 profila</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Filter pills -->
+    <div class="filter-pills">
+      <span style="font-size:0.75rem;color:var(--muted);font-weight:600;align-self:center;margin-right:0.25rem;">Prikaži:</span>
+      <button class="pill-btn active" id="ig-filter-all"      onclick="setIgFilter('all',this)">Sve</button>
+      <button class="pill-btn"        id="ig-filter-link"     onclick="setIgFilter('link',this)">Sa linkom</button>
+      <button class="pill-btn"        id="ig-filter-typeform" onclick="setIgFilter('typeform',this)">Sa Formom</button>
+      <button class="pill-btn"        id="ig-filter-neither"  onclick="setIgFilter('neither',this)">Bez linka</button>
+    </div>
+
+    <button class="btn-ig-search" id="ig-search-btn" onclick="startIgSearch()">🔍 Pretraži Instagram profile →</button>
+
+    <!-- AI toggle -->
+    <div style="margin-top:0.85rem;padding:0.85rem 1rem;background:var(--bg);border-radius:9px;border:1px solid var(--border);">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.6rem;">
+        <div>
+          <div style="font-size:0.85rem;font-weight:600;color:var(--text);">🤖 AI ocenjivanje profila</div>
+          <div style="font-size:0.75rem;color:var(--muted);">AI čita bio i daje ocenu 1-10. Sortira od najboljeg.</div>
+        </div>
+        <label class="chk"><input type="checkbox" id="use-ai-scoring" /></label>
+      </div>
+      <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+        <button class="pill-btn active" id="ai-model-gemini"      onclick="setAiModel('gemini',this)">✨ Gemini Flash</button>
+        <button class="pill-btn"        id="ai-model-openrouter"  onclick="setAiModel('openrouter',this)">🔀 OpenRouter (llama)</button>
+      </div>
+      <div id="ai-model-hint" style="font-size:0.72rem;color:var(--muted);margin-top:0.4rem;">Gemini: besplatno 1500/dan · <a href="https://aistudio.google.com/app/apikey" target="_blank" style="color:var(--accent2);">Nabavi ključ</a></div>
+    </div>
+    <div id="ig-alert-box"></div>
+    <div id="ig-token-counter" style="display:none; margin-top:0.6rem; font-size:0.78rem; color:var(--muted); display:flex; gap:1.5rem; flex-wrap:wrap;"></div>
+    <div id="ig-status-box" style="display:none; margin-top:1rem;">
+      <div class="prog-track"><div class="prog-fill" id="ig-prog-fill"></div></div>
+      <p id="ig-status-text" style="font-size:0.78rem;color:var(--muted);"></p>
+    </div>
+
+    <!-- Results -->
+    <div id="ig-results-section" style="display:none;">
+      <div class="ig-metrics" id="ig-metrics">
+        <div class="ig-metric"><div class="metric-val" id="igm-total">0</div><div class="metric-lbl">Ukupno</div></div>
+        <div class="ig-metric"><div class="metric-val" id="igm-link">0</div><div class="metric-lbl">Sa linkom</div></div>
+        <div class="ig-metric"><div class="metric-val" id="igm-typeform">0</div><div class="metric-lbl">Sa Formom</div></div>
+        <div class="ig-metric"><div class="metric-val" id="igm-neither">0</div><div class="metric-lbl">Bez linka</div></div>
+        <div class="ig-metric"><div class="metric-val" id="igm-saved" style="color:#f472b6;">0</div><div class="metric-lbl">Sačuvano ukupno</div></div>
+        <div class="ig-metric" id="igm-ai-card" style="display:none;"><div class="metric-val" id="igm-ai-avg" style="color:#a78bfa;">-</div><div class="metric-lbl">Prosečna AI ocena</div></div>
+      </div>
+      <div style="display:flex;gap:0.5rem;margin-bottom:0.85rem;flex-wrap:wrap;align-items:center;">
+        <button class="btn-csv" onclick="saveIgResults()" style="background:rgba(244,114,182,0.12);border-color:rgba(244,114,182,0.3);color:#f472b6;">💾 Sačuvaj rezultate</button>
+        <button class="btn-csv" onclick="loadSavedIg()" style="margin-top:0;">📂 Učitaj sačuvane</button>
+        <button class="btn-csv" onclick="clearSavedIg()" style="margin-top:0;background:rgba(239,68,68,0.08);border-color:rgba(239,68,68,0.2);color:#fca5a5;">🗑 Obriši sačuvane</button>
+      </div>
+      <div id="ig-profiles-grid" class="ig-profiles-grid"></div>
+      <button class="btn-csv" style="margin-top:1rem;" onclick="downloadIgCSV()">⬇ Preuzmi CSV</button>
+    </div>
+  </div>
+</div><!-- /ig-hunter-wrap -->
+</div><!-- /mode-ig-view -->
+
+<!-- ══ MODE: API KLJUČEVI ══ -->
+<div id="mode-keys-view" style="display:none;">
+<div style="max-width:760px; margin:3rem auto; padding:0 1.5rem 4rem;">
+
+  <div class="hero" style="padding:2rem 0 1.5rem;">
+    <div class="hero-badge"><span style="width:6px;height:6px;border-radius:50%;background:#f472b6;display:inline-block;margin-right:4px;"></span> Upravljanje API ključevima</div>
+    <h1 style="font-size:2rem;">API <span>Ključevi</span></h1>
+    <p style="color:var(--muted);font-size:0.9rem;">Dodaj više ključeva po servisu. Ako jedan potroši kredite, automatski prelazi na sledeći. Ključevi se čuvaju samo u tvom browseru.</p>
+  </div>
+
+  <!-- SerpAPI -->
+  <div class="search-card" style="margin-bottom:1rem;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem;flex-wrap:wrap;gap:0.5rem;">
+      <div>
+        <div style="font-weight:700;font-size:1rem;">🔎 SerpAPI</div>
+        <div style="font-size:0.75rem;color:var(--muted);">Google Maps + Instagram pretraga · 1 kredit = 1 poziv</div>
+      </div>
+      <a href="https://serpapi.com/manage-api-key" target="_blank" style="color:var(--accent2);font-size:0.75rem;text-decoration:none;border:1px solid rgba(124,106,247,0.3);padding:0.3rem 0.75rem;border-radius:6px;">Nabavi ključ →</a>
+    </div>
+
+    <div id="serpapi-keys-list" style="display:flex;flex-direction:column;gap:0.5rem;margin-bottom:0.85rem;"></div>
+
+    <div style="display:flex;gap:0.5rem;">
+      <input type="password" id="serpapi-new-key" placeholder="Dodaj novi SerpAPI ključ..." autocomplete="off"
+        style="flex:1;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:9px;padding:0.65rem 0.9rem;font-size:0.88rem;outline:none;font-family:inherit;"
+        onkeydown="if(event.key==='Enter') addKey('serpapi')" />
+      <button onclick="addKey('serpapi')"
+        style="background:rgba(124,106,247,0.15);border:1px solid rgba(124,106,247,0.3);color:var(--accent2);border-radius:9px;padding:0 1.1rem;font-size:0.85rem;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap;">
+        + Dodaj
+      </button>
+    </div>
+    <div style="margin-top:0.85rem;padding:0.6rem 0.9rem;background:var(--bg);border-radius:8px;border:1px solid var(--border);">
+      <div style="font-size:0.72rem;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.4rem;">Statistika sesije</div>
+      <div style="display:flex;gap:1.5rem;flex-wrap:wrap;font-size:0.8rem;">
+        <span>Ukupno poziva: <strong id="stat-serpapi-calls" style="color:var(--text);">0</strong></span>
+        <span>Krediti potrošeni: <strong id="stat-serpapi-credits" style="color:var(--accent2);">0</strong></span>
+        <span>Greške (iscrpljeni): <strong id="stat-serpapi-errors" style="color:#f87171;">0</strong></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Outscraper -->
+  <div class="search-card" style="margin-bottom:1rem;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem;flex-wrap:wrap;gap:0.5rem;">
+      <div>
+        <div style="font-weight:700;font-size:1rem;">🛰️ Outscraper</div>
+        <div style="font-size:0.75rem;color:var(--muted);">Google Maps scraping · krediti zavise od broja rezultata</div>
+      </div>
+      <a href="https://app.outscraper.cloud/profile" target="_blank" style="color:var(--accent2);font-size:0.75rem;text-decoration:none;border:1px solid rgba(124,106,247,0.3);padding:0.3rem 0.75rem;border-radius:6px;">Nabavi ključ →</a>
+    </div>
+
+    <div id="outscraper-keys-list" style="display:flex;flex-direction:column;gap:0.5rem;margin-bottom:0.85rem;"></div>
+
+    <div style="display:flex;gap:0.5rem;">
+      <input type="password" id="outscraper-new-key" placeholder="Dodaj novi Outscraper ključ..." autocomplete="off"
+        style="flex:1;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:9px;padding:0.65rem 0.9rem;font-size:0.88rem;outline:none;font-family:inherit;"
+        onkeydown="if(event.key==='Enter') addKey('outscraper')" />
+      <button onclick="addKey('outscraper')"
+        style="background:rgba(124,106,247,0.15);border:1px solid rgba(124,106,247,0.3);color:var(--accent2);border-radius:9px;padding:0 1.1rem;font-size:0.85rem;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap;">
+        + Dodaj
+      </button>
+    </div>
+    <div style="margin-top:0.85rem;padding:0.6rem 0.9rem;background:var(--bg);border-radius:8px;border:1px solid var(--border);">
+      <div style="font-size:0.72rem;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.4rem;">Statistika sesije</div>
+      <div style="display:flex;gap:1.5rem;flex-wrap:wrap;font-size:0.8rem;">
+        <span>Ukupno poziva: <strong id="stat-outscraper-calls" style="color:var(--text);">0</strong></span>
+        <span>Greške (iscrpljeni): <strong id="stat-outscraper-errors" style="color:#f87171;">0</strong></span>
+      </div>
+    </div>
+  </div>
+
+  <div style="margin-top:0.75rem;padding:0.85rem 1rem;background:rgba(234,179,8,0.06);border:1px solid rgba(234,179,8,0.15);border-radius:9px;font-size:0.8rem;color:#fde047;">
+    🔒 Ključevi se čuvaju isključivo u localStorage tvog browsera. Ne šalju se nigde osim direktno API servisu.
+  </div>
+
+  <!-- OpenRouter -->
+  <div class="search-card" style="margin-top:1rem;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem;flex-wrap:wrap;gap:0.5rem;">
+      <div>
+        <div style="font-weight:700;font-size:1rem;">🔀 OpenRouter AI</div>
+        <div style="font-size:0.75rem;color:var(--muted);">Pristup 200+ modela · Besplatni modeli (llama, mistral...) · openrouter.ai</div>
+      </div>
+      <a href="https://openrouter.ai/keys" target="_blank" style="color:var(--accent2);font-size:0.75rem;text-decoration:none;border:1px solid rgba(124,106,247,0.3);padding:0.3rem 0.75rem;border-radius:6px;">Besplatni ključ →</a>
+    </div>
+    <div id="openrouter-keys-list" style="display:flex;flex-direction:column;gap:0.5rem;margin-bottom:0.85rem;"></div>
+    <div style="display:flex;gap:0.5rem;">
+      <input type="password" id="openrouter-new-key" placeholder="Dodaj OpenRouter ključ (sk-or-...)..." autocomplete="off"
+        style="flex:1;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:9px;padding:0.65rem 0.9rem;font-size:0.88rem;outline:none;font-family:inherit;"
+        onkeydown="if(event.key==='Enter') addKey('openrouter')" />
+      <button onclick="addKey('openrouter')"
+        style="background:rgba(124,106,247,0.15);border:1px solid rgba(124,106,247,0.3);color:var(--accent2);border-radius:9px;padding:0 1.1rem;font-size:0.85rem;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap;">
+        + Dodaj
+      </button>
+    </div>
+    <div style="margin-top:0.85rem;padding:0.6rem 0.9rem;background:var(--bg);border-radius:8px;border:1px solid var(--border);">
+      <div style="font-size:0.72rem;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.4rem;">Statistika sesije</div>
+      <div style="display:flex;gap:1.5rem;flex-wrap:wrap;font-size:0.8rem;">
+        <span>Analiziranih profila: <strong id="stat-openrouter-calls" style="color:var(--text);">0</strong></span>
+        <span>Greške: <strong id="stat-openrouter-errors" style="color:#f87171;">0</strong></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Gemini -->
+  <div class="search-card" style="margin-top:1rem;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem;flex-wrap:wrap;gap:0.5rem;">
+      <div>
+        <div style="font-weight:700;font-size:1rem;">🤖 Google Gemini AI</div>
+        <div style="font-size:0.75rem;color:var(--muted);">Analiza Instagram profila · Besplatno 1500 req/dan · gemini-1.5-flash</div>
+      </div>
+      <a href="https://aistudio.google.com/app/apikey" target="_blank" style="color:var(--accent2);font-size:0.75rem;text-decoration:none;border:1px solid rgba(124,106,247,0.3);padding:0.3rem 0.75rem;border-radius:6px;">Besplatni ključ →</a>
+    </div>
+    <div id="gemini-keys-list" style="display:flex;flex-direction:column;gap:0.5rem;margin-bottom:0.85rem;"></div>
+    <div style="display:flex;gap:0.5rem;">
+      <input type="password" id="gemini-new-key" placeholder="Dodaj Gemini API ključ (AIza...)..." autocomplete="off"
+        style="flex:1;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:9px;padding:0.65rem 0.9rem;font-size:0.88rem;outline:none;font-family:inherit;"
+        onkeydown="if(event.key==='Enter') addKey('gemini')" />
+      <button onclick="addKey('gemini')"
+        style="background:rgba(124,106,247,0.15);border:1px solid rgba(124,106,247,0.3);color:var(--accent2);border-radius:9px;padding:0 1.1rem;font-size:0.85rem;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap;">
+        + Dodaj
+      </button>
+    </div>
+    <div style="margin-top:0.85rem;padding:0.6rem 0.9rem;background:var(--bg);border-radius:8px;border:1px solid var(--border);">
+      <div style="font-size:0.72rem;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.4rem;">Statistika sesije</div>
+      <div style="display:flex;gap:1.5rem;flex-wrap:wrap;font-size:0.8rem;">
+        <span>Analiziranih profila: <strong id="stat-gemini-calls" style="color:var(--text);">0</strong></span>
+        <span>Greške: <strong id="stat-gemini-errors" style="color:#f87171;">0</strong></span>
+      </div>
+    </div>
+  </div>
+
+</div>
+</div><!-- /mode-keys-view -->
+
+<!-- FOOTER -->
+<footer>Napravljeno sa ❤️ · Podaci: OpenStreetMap · <a href="https://github.com/Ihatespeed/pronalazac" target="_blank" style="color:var(--accent2);text-decoration:none;">GitHub</a></footer>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+// ════════════════════════════════════════
+// CONFIG
+// ════════════════════════════════════════
+const NOMINATIM_URL  = 'https://nominatim.openstreetmap.org/search';
+const OVERPASS_URLS  = [
+  'https://overpass-api.de/api/interpreter',
+  'https://overpass.kumi.systems/api/interpreter',
+  'https://overpass.openstreetmap.ru/api/interpreter'
+];
+const CORS_PROXY     = 'https://corsproxy.io/?url=';
+
+// proxiedFetch WITH key-pool rotation for SerpAPI/Outscraper
+// For non-keyed calls (OSM/Nominatim) just pass svc=null
+async function proxiedFetch(baseUrl, params, extraHeaders = {}, svc = null) {
+  const fullUrl = `${baseUrl}?${params.toString()}`;
+  const resp = await fetch(CORS_PROXY + encodeURIComponent(fullUrl), {
+    headers: { ...extraHeaders }
+  });
+  if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+  const data = await resp.json();
+  // Track usage if keyed service
+  if (svc) {
+    const usedKey = params.get('api_key') || extraHeaders['X-API-KEY'] || '';
+    const isExhausted = data.error && /credits|limit|quota|exceeded|insufficient/i.test(data.error);
+    if (isExhausted) {
+      markKeyExhausted(svc, usedKey);
+    } else {
+      trackKeyUsage(svc, usedKey, 1);
+    }
+  }
+  return data;
+}
+
+// Keyed fetch with automatic fallback to next key in pool
+async function keyedFetch(svc, baseUrl, paramsFn, extraHeadersFn = ()=>({})) {
+  let attempts = 0;
+  while (attempts < keyPool[svc].length + 1) {
+    const key = getActiveKey(svc);
+    if (!key) throw new Error(`Nema dostupnih ${svc} ključeva. Dodaj ih u API Ključevi.`);
+    const params = paramsFn(key);
+    const headers = extraHeadersFn(key);
+    const data = await proxiedFetch(baseUrl, params, headers);
+    // Check if this key is exhausted
+    if (data.error && /credits|limit|quota|exceeded|insufficient/i.test(data.error)) {
+      markKeyExhausted(svc, key);
+      attempts++;
+      continue; // try next key
+    }
+    // Success — track it
+    trackKeyUsage(svc, key, 1);
+    return data;
+  }
+  throw new Error(`Svi ${svc} ključevi su iscrpljeni.`);
+}
+
+const SERPAPI_BASE    = 'https://serpapi.com/search';
+const OUTSCRAPER_BASE = 'https://api.outscraper.cloud/maps/search';
+
+const PRESETS = {
+  hairdresser:[['shop','hairdresser']],
+  restaurant: [['amenity','restaurant']],
+  cafe_bar:   [['amenity','cafe'],['amenity','bar'],['amenity','pub']],
+  bakery:     [['shop','bakery']],
+  pharmacy:   [['amenity','pharmacy']],
+  dentist:    [['amenity','dentist'],['healthcare','dentist']],
+  car_repair: [['shop','car_repair']],
+  fitness:    [['leisure','fitness_centre'],['sport','fitness']],
+  beauty:     [['shop','beauty'],['beauty','salon']],
+  hotel:      [['tourism','hotel'],['tourism','guest_house'],['tourism','apartment']],
+  shop:       [['shop','']],
+  doctors:    [['amenity','doctors'],['amenity','clinic'],['healthcare','doctor']],
+  lawyer:     [['office','lawyer']],
+  florist:    [['shop','florist']],
+  optician:   [['shop','optician']],
+  veterinary: [['amenity','veterinary']],
+  custom:     []
+};
+
+const PRESET_LABELS = {
+  hairdresser:'frizer', restaurant:'restoran', cafe_bar:'kafic', bakery:'pekara',
+  pharmacy:'apoteka', dentist:'zubar', car_repair:'auto servis', fitness:'teretana',
+  beauty:'kozmetički salon', hotel:'hotel', shop:'prodavnica', doctors:'lekar',
+  lawyer:'advokat', florist:'cvecara', optician:'optika', veterinary:'veterinar'
+};
+
+let leadsData  = [];
+let currentSrc = 'osm';
+let leafletMap = null, markersLyr = null;
+
+// ════════════════════════════════════════
+// UTILS
+// ════════════════════════════════════════
+const $ = id => document.getElementById(id);
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const esc = s => String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const csvCell = v => { const s=String(v??''); return (s.includes(',')||s.includes('"')||s.includes('\n'))?`"${s.replace(/"/g,'""')}"`:''+s; };
+
+function showAlert(msg, type, tid='alert-box') { $(tid).innerHTML=`<div class="alert alert-${type}">${msg}</div>`; }
+function clearAlert(tid='alert-box') { $(tid).innerHTML=''; }
+function setProgress(p, txt) {
+  $('prog-fill').style.width=(Math.min(p,1)*100).toFixed(1)+'%';
+  $('status-text').textContent=txt;
+}
+function resetUI() { $('search-btn').disabled=false; }
+
+// ════════════════════════════════════════
+// SOURCE / localStorage
+// ════════════════════════════════════════
+function setSource(src, btn) {
+  currentSrc = src;
+  document.querySelectorAll('.src-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  $('serpapi-opts').style.display    = src==='serpapi'    ? 'block' : 'none';
+  $('outscraper-opts').style.display = src==='outscraper' ? 'block' : 'none';
+  clearAlert();
+}
+
+// ════════════════════════════════════════
+// API KEY POOL SYSTEM
+// ════════════════════════════════════════
+const keyPool = { serpapi: [], outscraper: [], gemini: [], openrouter: [] };
+const sessionStats = { serpapi: {calls:0,credits:0,errors:0}, outscraper: {calls:0,credits:0,errors:0}, gemini: {calls:0,errors:0}, openrouter: {calls:0,errors:0} };
+
+function saveKeyPool() {
+  localStorage.setItem('keypool_serpapi',    JSON.stringify(keyPool.serpapi.map(k=>k.key)));
+  localStorage.setItem('keypool_outscraper', JSON.stringify(keyPool.outscraper.map(k=>k.key)));
+  localStorage.setItem('keypool_gemini',     JSON.stringify(keyPool.gemini.map(k=>k.key)));
+  localStorage.setItem('keypool_openrouter', JSON.stringify(keyPool.openrouter.map(k=>k.key)));
+}
+function loadKeyPool() {
+  ['serpapi','outscraper','gemini','openrouter'].forEach(svc => {
+    const saved = JSON.parse(localStorage.getItem('keypool_'+svc)||'[]');
+    const old = localStorage.getItem('key_'+svc);
+    const all = [...new Set([...saved, ...(old?[old]:[])])];
+    keyPool[svc] = all.map(key=>({key,exhausted:false,calls:0,credits:0}));
+    renderKeyList(svc);
+  });
+  saveKeyPool();
+}
+function addKey(svc) {
+  const inp = $(svc+'-new-key');
+  if (!inp) return;
+  const val = inp.value.trim();
+  if (!val || keyPool[svc].some(k=>k.key===val)) { inp.value=''; return; }
+  keyPool[svc].push({key:val,exhausted:false,calls:0,credits:0});
+  saveKeyPool(); renderKeyList(svc); inp.value='';
+}
+function removeKey(svc, idx) {
+  keyPool[svc].splice(idx,1);
+  saveKeyPool(); renderKeyList(svc);
+}
+function renderKeyList(svc) {
+  const list=$(svc+'-keys-list');
+  if (!list) return;
+  if (!keyPool[svc].length) {
+    list.innerHTML=`<div style="font-size:0.78rem;color:var(--muted);padding:0.4rem 0;">Nema sačuvanih ključeva.</div>`;
+    return;
+  }
+  list.innerHTML=keyPool[svc].map((k,i)=>{
+    const dot  = k.exhausted?'key-dot-exhausted':(k.calls>0?'key-dot-active':'key-dot-idle');
+    const item = k.exhausted?'exhausted-key':(k.calls>0?'active-key':'');
+    const masked = k.key.substring(0,8)+'••••••••'+k.key.slice(-4);
+    const info = k.exhausted?'⚠ iscrpljen':(svc==='serpapi'?`${k.credits} kredita`:`${k.calls} poziva`);
+    return `<div class="key-item ${item}">
+      <span class="key-dot ${dot}"></span>
+      <span class="key-label">${masked}</span>
+      <span class="key-credits">${info}</span>
+      <button class="key-del" onclick="removeKey('${svc}',${i})" title="Ukloni">×</button>
+    </div>`;
+  }).join('');
+}
+function updateStatDisplay(svc) {
+  const s=sessionStats[svc];
+  if (svc==='serpapi') {
+    const e1=$('stat-serpapi-calls');   if(e1) e1.textContent=s.calls;
+    const e2=$('stat-serpapi-credits'); if(e2) e2.textContent=s.credits;
+    const e3=$('stat-serpapi-errors');  if(e3) e3.textContent=s.errors;
+  } else if (svc==='outscraper') {
+    const e1=$('stat-outscraper-calls');  if(e1) e1.textContent=s.calls;
+    const e2=$('stat-outscraper-errors'); if(e2) e2.textContent=s.errors;
+  } else if (svc==='gemini') {
+    const e1=$('stat-gemini-calls');  if(e1) e1.textContent=s.calls;
+    const e2=$('stat-gemini-errors'); if(e2) e2.textContent=s.errors;
+  } else if (svc==='openrouter') {
+    const e1=$('stat-openrouter-calls');  if(e1) e1.textContent=s.calls;
+    const e2=$('stat-openrouter-errors'); if(e2) e2.textContent=s.errors;
+  }
+}
+function getActiveKey(svc) { return (keyPool[svc].find(k=>!k.exhausted)||{}).key||null; }
+function markKeyExhausted(svc, usedKey) {
+  const k=keyPool[svc].find(k=>k.key===usedKey);
+  if(k){k.exhausted=true; sessionStats[svc].errors++;}
+  renderKeyList(svc); updateStatDisplay(svc);
+}
+function trackKeyUsage(svc, usedKey, credits=1) {
+  const k=keyPool[svc].find(k=>k.key===usedKey);
+  if(k){k.calls++; k.credits+=credits;}
+  sessionStats[svc].calls++;
+  sessionStats[svc].credits=(sessionStats[svc].credits||0)+credits;
+  renderKeyList(svc); updateStatDisplay(svc);
+}
+function showTokenCounter(counterId, svc) {
+  const el=$(counterId); if(!el) return;
+  const s=sessionStats[svc];
+  el.style.display='flex';
+  const keysLeft=keyPool[svc].filter(k=>!k.exhausted).length;
+  el.innerHTML=`
+    <span class="token-stat">🔑 Pozivi: <strong>${s.calls}</strong></span>
+    <span class="token-stat">💳 Krediti: <strong>${s.credits}</strong></span>
+    <span class="token-stat">� Aktivnih ključeva: <strong>${keysLeft}</strong></span>
+  `;
+}
+function getKey(svc) { return getActiveKey(svc)||''; }
+function saveKey()  {} // legacy placeholder
+function loadKeys() {} // legacy placeholder
+window.addEventListener('DOMContentLoaded', loadKeyPool);
+
+function onPresetChange() {
+  $('custom-row').style.display = $('preset').value==='custom' ? 'block' : 'none';
+}
+function switchTab(name, btn) {
+  document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  $('tab-'+name).classList.add('active'); btn.classList.add('active');
+  if (name==='map') renderMap();
+}
+function passesFilters(l) {
+  if ($('f-no-website').checked  &&  l.sajt)    return false;
+  if ($('f-with-phone').checked  && !l.telefon) return false;
+  if ($('f-with-address').checked && !l.adresa) return false;
+  return true;
+}
+</script>
+
+<script>
+// ════════════════════════════════════════
+// OSM
+// ════════════════════════════════════════
+function buildOsmQuery(bbox, filters, custom, timeout) {
+  const {south,north,west,east}=bbox, area=`(${south},${west},${north},${east})`;
+  const p=[];
+  for(const [k,v] of filters){ const t=v?`["${k}"="${v}"]`:`["${k}"]`; p.push(`  node${t}${area};`,`  way${t}${area};`); }
+  if(custom){ const ct=custom.replace(/"/g,'\\"');
+    ['name','shop','amenity'].forEach(k=>{ p.push(`  node["${k}"~"${ct}",i]${area};`,`  way["${k}"~"${ct}",i]${area};`); }); }
+  return `[out:json][timeout:${timeout}];\n(\n${p.join('\n')}\n);\nout center tags;`;
+}
+
+async function searchOSM(location, presetKey, custom, timeout, max) {
+  setProgress(0.02, 'Tražim lokaciju...');
+  const r1 = await fetch(`${NOMINATIM_URL}?q=${encodeURIComponent(location)}&format=json&limit=1`,
+    {headers:{'User-Agent':'PronalazacKlijenata/3.0'}});
+  const nd = await r1.json();
+  if (!nd.length) throw new Error('Nije pronađena lokacija.');
+  const bb=nd[0].boundingbox;
+  const bbox={south:+bb[0],north:+bb[1],west:+bb[2],east:+bb[3]};
+
+  setProgress(0.06,'Pretražujem firme...');
+  const query=buildOsmQuery(bbox, PRESETS[presetKey]||[], presetKey==='custom'?custom:'', timeout);
+  let ovData=null;
+  for(const url of OVERPASS_URLS){
+    try{
+      const r=await fetch(url,{method:'POST',body:'data='+encodeURIComponent(query),headers:{'Content-Type':'application/x-www-form-urlencoded'}});
+      if(r.ok){ovData=await r.json();break;}
+    }catch(_){await sleep(600);}
+  }
+  if(!ovData) throw new Error('Overpass serveri nedostupni. Pokušajte ponovo.');
+
+  const elements=ovData.elements||[], seen=new Set(), leads=[];
+  for(let i=0;i<elements.length;i++){
+    const el=elements[i], tags=el.tags||{};
+    const name=(tags.name||'').trim();
+    if(!name||seen.has(name.toLowerCase())) continue;
+    const website=tags.website||tags['contact:website']||tags.url||'';
+    const phone=tags.phone||tags['contact:phone']||tags['contact:mobile']||'';
+    const email=tags.email||tags['contact:email']||'';
+    const adresa=[tags['addr:street'],tags['addr:housenumber'],tags['addr:postcode'],tags['addr:city']].filter(Boolean).join(' ');
+    const tip=tags.shop||tags.amenity||tags.office||tags.tourism||'';
+    const lat=el.lat||(el.center&&el.center.lat)||'';
+    const lon=el.lon||(el.center&&el.center.lon)||'';
+    const lead={naziv:name,telefon:phone,email,adresa,tip,ocena:'',reviews:0,sajt:website,instagram:'',mapa:lat?`https://www.google.com/maps?q=${lat},${lon}`:'',lat,lon};
+    if(!passesFilters(lead)){setProgress((i+1)/elements.length,`⏭ ${name}`);continue;}
+    if(leads.length>=max) break;
+    seen.add(name.toLowerCase()); leads.push(lead);
+    setProgress((i+1)/elements.length,`✓ ${name}`);
+    if(i%30===0) await sleep(0);
+  }
+  return leads;
+}
+
+// ════════════════════════════════════════
+// SERPAPI
+// ════════════════════════════════════════
+async function searchSerpAPI(location, presetKey, custom, pages, max) {
+  if(!getActiveKey('serpapi')) throw new Error('Nema SerpAPI ključeva. Dodaj ih u � API Ključevi.');
+  const q=(presetKey==='custom'?custom:(PRESET_LABELS[presetKey]||presetKey))+' '+location;
+  const leads=[], seen=new Set();
+  for(let page=0;page<pages;page++){
+    setProgress((page+1)/pages,`SerpAPI: stranica ${page+1}... (${sessionStats.serpapi.calls} poziva)`);
+    showTokenCounter('token-counter','serpapi');
+    const data = await keyedFetch('serpapi', SERPAPI_BASE,
+      key => new URLSearchParams({engine:'google_maps',type:'search',q,start:String(page*20),api_key:key})
+    );
+    if(data.error && !/credits|limit|quota|exceeded|insufficient/i.test(data.error))
+      throw new Error('SerpAPI: '+data.error);
+    for(const r of data.local_results||[]){
+      const name=(r.title||'').trim();
+      if(!name||seen.has(name.toLowerCase())) continue;
+      const g=r.gps_coordinates||{};
+      const lead={naziv:name,telefon:r.phone||'',email:'',adresa:r.address||'',tip:r.type||'',ocena:r.rating||'',reviews:parseInt(r.reviews||r.reviews_count||0)||0,sajt:r.website||'',instagram:'',mapa:g.latitude?`https://www.google.com/maps?q=${g.latitude},${g.longitude}`:'',lat:g.latitude||'',lon:g.longitude||''};
+      if(!passesFilters(lead)) continue;
+      if(leads.length>=max) break;
+      seen.add(name.toLowerCase()); leads.push(lead);
+    }
+    if(leads.length>=max||!data.serpapi_pagination?.next) break;
+    await sleep(800);
+  }
+  return leads;
+}
+
+// ════════════════════════════════════════
+// OUTSCRAPER
+// ════════════════════════════════════════
+async function searchOutscraper(location, presetKey, custom, limit, max) {
+  if(!getActiveKey('outscraper')) throw new Error('Nema Outscraper ključeva. Dodaj ih u � API Ključevi.');
+  const term=presetKey==='custom'?custom:(PRESET_LABELS[presetKey]||presetKey);
+  setProgress(0.1,'Outscraper: šaljem zahtev...');
+  showTokenCounter('token-counter','outscraper');
+  const data = await keyedFetch('outscraper', OUTSCRAPER_BASE,
+    key => new URLSearchParams({query:`${term}, ${location}`,limit:String(limit),async:'false',language:'sr',key}),
+    key => ({'X-API-KEY': key})
+  );
+  if(data.status==='Error') throw new Error('Outscraper: '+(data.errorMessage||'Greška'));
+  const all=(data.data||[]).flatMap(g=>Array.isArray(g)?g:[g]);
+  const leads=[], seen=new Set();
+  for(let i=0;i<all.length;i++){
+    const r=all[i], name=(r.name||'').trim();
+    if(!name||seen.has(name.toLowerCase())) continue;
+    const lead={naziv:name,telefon:r.phone||'',email:r.email_1||'',adresa:r.full_address||r.address||'',tip:r.type||'',ocena:r.rating||'',reviews:parseInt(r.reviews||r.reviews_count||r.user_ratings_total||0)||0,sajt:r.site||r.website||'',instagram:'',mapa:r.latitude?`https://www.google.com/maps?q=${r.latitude},${r.longitude}`:'',lat:r.latitude||'',lon:r.longitude||''};
+    if(!passesFilters(lead)) continue;
+    if(leads.length>=max) break;
+    seen.add(name.toLowerCase()); leads.push(lead);
+    setProgress((i+1)/all.length,`✓ ${name}`);
+    if(i%30===0) await sleep(0);
+  }
+  return leads;
+}
+
+// ════════════════════════════════════════
+// INSTAGRAM
+// ════════════════════════════════════════
+async function enrichInstagram(leads, location) {
+  if(!getActiveKey('serpapi')) throw new Error('Za Instagram potreban je SerpAPI ključ. Dodaj ga u API Ključevi.');
+  for(let i=0;i<leads.length;i++){
+    setProgress((i+1)/leads.length,`📸 Instagram: ${leads[i].naziv} (${i+1}/${leads.length}) · ${sessionStats.serpapi.calls} poziva`);
+    showTokenCounter('token-counter','serpapi');
+    try{
+      const q=`"${leads[i].naziv}" ${location} site:instagram.com`;
+      const data = await keyedFetch('serpapi', SERPAPI_BASE,
+        key => new URLSearchParams({engine:'google',q,num:'3',api_key:key})
+      );
+      let ig='';
+      for(const r of data.organic_results||[]){
+        const link=r.link||'';
+        if(!link.includes('instagram.com/')) continue;
+        const path=link.replace('https://www.instagram.com/','').replace('https://instagram.com/','');
+        if(path&&!['explore/','p/','reel/','tags/','locations/'].some(x=>path.startsWith(x))){ig=link;break;}
+      }
+      leads[i].instagram=ig;
+    }catch(_){leads[i].instagram='';}
+    await sleep(500);
+  }
+  return leads;
+}
+
+// ════════════════════════════════════════
+// MAIN
+// ════════════════════════════════════════
+async function startSearch() {
+  const presetKey=$('preset').value, location=$('location').value.trim();
+  const custom=$('custom-text').value.trim();
+  const max=parseInt($('max-results').value);
+  const timeout=30;
+  const pages=parseInt($('max-pages').value||3);
+  const ocLimit=parseInt($('oc-limit').value||100);
+  const doIg=$('find-instagram').checked;
+
+  if(!location){showAlert('⚠️ Unesi lokaciju.','warning');return;}
+  if(presetKey==='custom'&&!custom&&currentSrc==='osm'){showAlert('⚠️ Unesi ključnu reč.','warning');return;}
+
+  clearAlert(); leadsData=[];
+  $('results-body').innerHTML='';
+  $('results-section').style.display='none';
+  $('status-box').style.display='block';
+  $('search-btn').disabled=true;
+  setProgress(0,'Pokretanje...');
+
+  try{
+    if(currentSrc==='osm')        leadsData=await searchOSM(location,presetKey,custom,timeout,max);
+    else if(currentSrc==='serpapi') leadsData=await searchSerpAPI(location,presetKey,custom,pages,max);
+    else                            leadsData=await searchOutscraper(location,presetKey,custom,ocLimit,max);
+
+    if(leadsData.length&&doIg){
+      showAlert(`📸 Tražim Instagram za ${leadsData.length} firmi...`,'info');
+      leadsData=await enrichInstagram(leadsData,location);
+      clearAlert();
+    }
+
+    $('status-box').style.display='none';
+    if(!leadsData.length){showAlert('ℹ️ Nijedna firma nije pronađena. Promenite podešavanja ili izvor podataka.','info');resetUI();return;}
+
+    const tbody=$('results-body');
+    leadsData.forEach((l,i)=>{
+      const stars=l.ocena
+        ? `<span class="stars">${'★'.repeat(Math.round(+l.ocena||0))}${'☆'.repeat(5-Math.round(+l.ocena||0))}</span> <strong style="color:var(--text)">${l.ocena}</strong>${l.reviews?`<span class="reviews">(${l.reviews.toLocaleString()})</span>`:''}`
+        : (l.reviews ? `<span class="reviews">${l.reviews.toLocaleString()} rec.</span>` : '');
+      const tr=document.createElement('tr');
+      tr.innerHTML=
+        `<td>${i+1}</td>`+
+        `<td><strong style="color:var(--text)">${esc(l.naziv)}</strong></td>`+
+        `<td>${esc(l.telefon)}</td>`+
+        `<td>${l.email?`<a href="mailto:${esc(l.email)}">${esc(l.email)}</a>`:''}</td>`+
+        `<td>${esc(l.adresa)}</td>`+
+        `<td>${l.tip?`<span class="tag">${esc(l.tip)}</span>`:''}</td>`+
+        `<td>${stars}</td>`+
+        `<td>${l.reviews?`<span style="color:var(--text);font-weight:600">${l.reviews.toLocaleString()}</span>`:''}</td>`+
+        `<td>${l.sajt?`<a href="${esc(l.sajt)}" target="_blank">↗</a>`:''}</td>`+
+        `<td>${l.instagram?`<a href="${esc(l.instagram)}" target="_blank">📸</a>`:''}</td>`+
+        `<td>${l.mapa?`<a href="${esc(l.mapa)}" target="_blank">📍</a>`:''}</td>`;
+      tbody.appendChild(tr);
+    });
+
+    $('m-total').textContent=leadsData.length;
+    $('m-phone').textContent=leadsData.filter(l=>l.telefon).length;
+    $('m-address').textContent=leadsData.filter(l=>l.adresa).length;
+    $('m-nosite').textContent=leadsData.filter(l=>!l.sajt).length;
+    $('m-email').textContent=leadsData.filter(l=>l.email).length;
+    $('m-ig').textContent=leadsData.filter(l=>l.instagram).length;
+    if(doIg) $('m-ig-card').style.display='block';
+
+    showAlert(`✓ Pronađeno ${leadsData.length} firmi.`,'success','results-alert');
+    $('results-section').style.display='block';
+  }catch(err){
+    $('status-box').style.display='none';
+    showAlert(`❌ ${err.message}`,'error');
+  }
+  resetUI();
+}
+
+// ════════════════════════════════════════
+// SORT
+// ════════════════════════════════════════
+let sortCol = null, sortDir = 1;
+
+function sortTable(col) {
+  if (sortCol === col) {
+    sortDir *= -1;
+  } else {
+    sortCol = col; sortDir = -1; // prvo descending
+  }
+
+  // Ažuriraj header stilove
+  document.querySelectorAll('thead th.sortable').forEach(th => {
+    th.classList.remove('sort-asc','sort-desc');
+    if (th.getAttribute('onclick') === `sortTable('${col}')`) {
+      th.classList.add(sortDir === 1 ? 'sort-asc' : 'sort-desc');
+    }
+  });
+
+  leadsData.sort((a, b) => {
+    let va = a[col], vb = b[col];
+    if (col === 'ocena' || col === 'reviews') {
+      va = parseFloat(va) || 0;
+      vb = parseFloat(vb) || 0;
+      return (va - vb) * sortDir;
+    }
+    // string sort
+    va = String(va ?? '').toLowerCase();
+    vb = String(vb ?? '').toLowerCase();
+    return va < vb ? -sortDir : va > vb ? sortDir : 0;
+  });
+
+  rerenderTable();
+}
+
+function rerenderTable() {
+  const tbody = $('results-body');
+  tbody.innerHTML = '';
+  leadsData.forEach((l, i) => {
+    const stars = l.ocena
+      ? `<span class="stars">${'★'.repeat(Math.round(+l.ocena||0))}${'☆'.repeat(5-Math.round(+l.ocena||0))}</span> <strong style="color:var(--text)">${l.ocena}</strong>${l.reviews ? `<span class="reviews">(${l.reviews.toLocaleString()})</span>` : ''}`
+      : (l.reviews ? `<span class="reviews">${l.reviews.toLocaleString()} rec.</span>` : '');
+    const tr = document.createElement('tr');
+    tr.innerHTML =
+      `<td>${i+1}</td>`+
+      `<td><strong style="color:var(--text)">${esc(l.naziv)}</strong></td>`+
+      `<td>${esc(l.telefon)}</td>`+
+      `<td>${l.email?`<a href="mailto:${esc(l.email)}">${esc(l.email)}</a>`:''}</td>`+
+      `<td>${esc(l.adresa)}</td>`+
+      `<td>${l.tip?`<span class="tag">${esc(l.tip)}</span>`:''}</td>`+
+      `<td>${stars}</td>`+
+      `<td>${l.reviews?`<span style="color:var(--text);font-weight:600">${l.reviews.toLocaleString()}</span>`:''}</td>`+
+      `<td>${l.sajt?`<a href="${esc(l.sajt)}" target="_blank">↗</a>`:''}</td>`+
+      `<td>${l.instagram?`<a href="${esc(l.instagram)}" target="_blank">📸</a>`:''}</td>`+
+      `<td>${l.mapa?`<a href="${esc(l.mapa)}" target="_blank">📍</a>`:''}</td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+// ════════════════════════════════════════
+// MAP
+// ════════════════════════════════════════
+function renderMap(){
+  if(!leafletMap){
+    leafletMap=L.map('map');
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+      attribution:'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',maxZoom:19
+    }).addTo(leafletMap);
+    markersLyr=L.layerGroup().addTo(leafletMap);
+  } else markersLyr.clearLayers();
+  const pts=[];
+  for(const l of leadsData){
+    const lat=+l.lat,lon=+l.lon;
+    if(isNaN(lat)||isNaN(lon)) continue;
+    pts.push([lat,lon]);
+    L.marker([lat,lon]).bindPopup(`<strong>${esc(l.naziv)}</strong><br/>${l.telefon?'📞 '+esc(l.telefon)+'<br/>':''}${l.adresa?'📍 '+esc(l.adresa)+'<br/>':''}${l.mapa?`<a href="${l.mapa}" target="_blank">Google Maps</a>`:''}`).addTo(markersLyr);
+  }
+  if(pts.length) leafletMap.fitBounds(L.latLngBounds(pts),{padding:[30,30]});
+}
+
+// ════════════════════════════════════════
+// CSV
+// ════════════════════════════════════════
+function downloadCSV(){
+  if(!leadsData.length) return;
+  const hdr=['Naziv','Telefon','Email','Adresa','Tip','Ocena','Recenzije','Sajt','Instagram','Mapa'];
+  const rows=leadsData.map(r=>[r.naziv,r.telefon,r.email,r.adresa,r.tip,r.ocena,r.reviews||0,r.sajt,r.instagram,r.mapa].map(csvCell).join(','));
+  const csv='\uFEFF'+[hdr.join(','),...rows].join('\r\n');
+  const a=Object.assign(document.createElement('a'),{
+    href:URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'})),
+    download:`klijenti_${$('preset').options[$('preset').selectedIndex].text}_${$('location').value.trim()}.csv`.replace(/\s+/g,'_')
+  });
+  a.click();
+}
+
+document.addEventListener('keydown',e=>{ if(e.key==='Enter'&&!$('search-btn').disabled) startSearch(); });
+
+// ════════════════════════════════════════
+// AI SCORING — Gemini + OpenRouter
+// ════════════════════════════════════════
+const GEMINI_BASE     = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
+const OPENROUTER_BASE = 'https://openrouter.ai/api/v1/chat/completions';
+const OPENROUTER_MODEL = 'meta-llama/llama-3.2-3b-instruct:free';
+
+let selectedAiModel = 'gemini';
+
+function setAiModel(model, btn) {
+  selectedAiModel = model;
+  document.querySelectorAll('#ai-model-gemini,#ai-model-openrouter').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  const hints = {
+    gemini:     'Gemini Flash: besplatno 1500/dan · <a href="https://aistudio.google.com/app/apikey" target="_blank" style="color:var(--accent2);">Nabavi ključ</a>',
+    openrouter: 'OpenRouter llama-3.2-3b: besplatan · <a href="https://openrouter.ai/keys" target="_blank" style="color:var(--accent2);">Nabavi ključ</a>'
+  };
+  const hint = $('ai-model-hint');
+  if (hint) hint.innerHTML = hints[model] || '';
+}
+
+function buildAiPrompt(profile, niche, country) {
+  return `You are a lead qualification AI. Analyze this Instagram profile and determine if it's a real INDIVIDUAL (person) offering "${niche}" services in ${country}.
+
+Profile:
+- Username: @${profile.username}
+- Display name: ${profile.displayName}
+- Bio: ${profile.bio || '(empty)'}
+- External link: ${profile.externalUrl || 'none'}
+- Form detected: ${profile.formUrl || 'none'}
+
+Scoring criteria (1-10):
+- 8-10: Individual person (not a brand/org/studio), clearly works as "${niche}", bio mentions it directly, based in ${country}
+- 5-7: Likely individual, partially relevant to "${niche}", may be in ${country}
+- 3-4: Unclear if individual or brand, weak niche match
+- 1-2: Brand account, organization, studio, gym, association, OR completely different niche (e.g. jewelry store found via "personal" keyword, street workout organization, multi-coach studio)
+
+PENALIZE HEAVILY (score 1-2) if:
+- Username has 2+ dots (e.g. street.workout.serbia = organization)
+- Bio mentions "tim", "team", "ekipa", "studio", "gym", "centar", "academy", "federation", "club"
+- Clearly a business/brand, not an individual coach/trainer
+- Different profession entirely (jeweler, metal shop, etc. found via keyword false-match)
+
+Reply ONLY with JSON: {"score":7,"reason":"One sentence in Serbian","relevant":true,"language":"sr"}`;
+}
+
+async function callGemini(prompt) {
+  const key = getActiveKey('gemini');
+  if (!key) throw new Error('Nema Gemini ključa. Dodaj ga u 🔑 API Ključevi.');
+  const resp = await fetch(`${GEMINI_BASE}?key=${key}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: { temperature: 0.1, maxOutputTokens: 120 }
+    })
+  });
+  if (resp.status === 429 || resp.status === 403) { markKeyExhausted('gemini', key); return null; }
+  const data = await resp.json();
+  if (data.error) { sessionStats.gemini.errors++; updateStatDisplay('gemini'); return null; }
+  trackKeyUsage('gemini', key, 1);
+  sessionStats.gemini.calls++; updateStatDisplay('gemini');
+  return data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+}
+
+async function callOpenRouter(prompt) {
+  const key = getActiveKey('openrouter');
+  if (!key) throw new Error('Nema OpenRouter ključa. Dodaj ga u 🔑 API Ključevi.');
+  const resp = await fetch(OPENROUTER_BASE, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${key}`,
+      'HTTP-Referer': location.origin,
+      'X-Title': 'Pronalazac Klijenata'
+    },
+    body: JSON.stringify({
+      model: OPENROUTER_MODEL,
+      messages: [{ role: 'user', content: prompt }],
+      max_tokens: 120,
+      temperature: 0.1
+    })
+  });
+  if (resp.status === 429 || resp.status === 402) { markKeyExhausted('openrouter', key); return null; }
+  const data = await resp.json();
+  if (data.error) { sessionStats.openrouter.errors++; updateStatDisplay('openrouter'); return null; }
+  trackKeyUsage('openrouter', key, 1);
+  sessionStats.openrouter.calls++; updateStatDisplay('openrouter');
+  return data.choices?.[0]?.message?.content || '';
+}
+
+async function scoreProfileWithAI(profile, niche, country) {
+  const prompt = buildAiPrompt(profile, niche, country);
+  let text = null;
+  try {
+    text = selectedAiModel === 'openrouter' ? await callOpenRouter(prompt) : await callGemini(prompt);
+    if (!text) return null;
+    const jsonMatch = text.match(/\{[\s\S]*?\}/);
+    if (!jsonMatch) return null;
+    return JSON.parse(jsonMatch[0]);
+  } catch(e) { return null; }
+}
+
+async function runAIScoring(profiles, niche, country) {
+  for (let i = 0; i < profiles.length; i++) {
+    igSetProgress((i+1)/profiles.length, `🤖 AI ocenjuje ${i+1}/${profiles.length}: @${profiles[i].username}`);
+    const result = await scoreProfileWithAI(profiles[i], niche, country);
+    profiles[i].aiScore   = result?.score   || 0;
+    profiles[i].aiReason  = result?.reason  || '';
+    profiles[i].aiLang    = result?.language || '';
+    profiles[i].aiRelevant = result?.relevant !== false;
+    await sleep(150);
+  }
+  // Sort best → worst
+  profiles.sort((a,b) => (b.aiScore||0) - (a.aiScore||0));
+  return profiles;
+}
+
+// ════════════════════════════════════════
+// MODE SWITCHER
+// ════════════════════════════════════════
+function setMode(mode) {
+  $('mode-leads-view').style.display  = mode==='leads' ? 'block' : 'none';
+  $('mode-ig-view').style.display     = mode==='ig'    ? 'block' : 'none';
+  $('mode-keys-view').style.display   = mode==='keys'  ? 'block' : 'none';
+  $('mode-leads').classList.toggle('active', mode==='leads');
+  $('mode-ig').classList.toggle('active',    mode==='ig');
+  $('mode-keys').classList.toggle('active',  mode==='keys');
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+
+// ════════════════════════════════════════
+// INSTAGRAM HUNTER
+// ════════════════════════════════════════
+let igData = [], igFilter = 'all';
+let selectedNiche = 'fitness trainer';
+
+// ── Niche config: srpski/engleski ključne reči, brendirani signal reči ──
+const NICHE_CONFIG = {
+  'fitness trainer': {
+    searchTerms: ['personal trainer', 'fitness trener', 'personalni trener', 'pt coach'],
+    bioKeywords:  ['trener', 'trainer', 'fitness', 'personal', 'coaching', 'workout', 'gym', 'vežbanje', 'transformacija', 'body', 'kondicioniranje'],
+    bioRequired:  ['trener', 'trainer', 'fitness', 'coach', 'pt', 'personal', 'vežbanje', 'gym', 'kondic'],
+    brandSignals: ['studio', 'gym', 'centar', 'akademija', 'klub', 'school', 'organization', 'official', 'team', 'federation'],
+  },
+  'personal trainer': {
+    searchTerms: ['personal trainer', 'personalni trener', 'pt coach', 'fitness coach'],
+    bioKeywords:  ['personal', 'trener', 'trainer', 'fitness', 'coaching', 'transformation', 'body', 'workout'],
+    bioRequired:  ['personal', 'trener', 'trainer', 'coach', 'pt', 'fitness'],
+    brandSignals: ['studio', 'gym', 'centar', 'akademija', 'klub', 'school', 'organization', 'official', 'team'],
+  },
+  'life coach': {
+    searchTerms: ['life coach', 'lajf kouc', 'motivacioni govornik', 'personal development'],
+    bioKeywords:  ['coach', 'kouc', 'mentoring', 'motivacija', 'razvoj', 'transformation', 'mindset'],
+    bioRequired:  ['coach', 'kouc', 'mentor', 'motivac'],
+    brandSignals: ['agencija', 'studio', 'organization', 'official', 'team', 'centar'],
+  },
+  'nutritionist': {
+    searchTerms: ['nutricionist', 'nutritionist', 'dijetetičar', 'ishrana coach'],
+    bioKeywords:  ['nutricionist', 'nutritionist', 'ishrana', 'dijeta', 'dijetetičar', 'nutrition', 'zdrava ishrana'],
+    bioRequired:  ['nutricionist', 'nutritionist', 'ishrana', 'dijeta', 'nutrition'],
+    brandSignals: ['klinika', 'centar', 'ordinacija', 'studio', 'organization', 'official'],
+  },
+  'yoga instructor': {
+    searchTerms: ['yoga instruktor', 'yoga instructor', 'joga učitelj', 'yoga teacher'],
+    bioKeywords:  ['yoga', 'joga', 'instructor', 'instruktor', 'meditation', 'meditacija', 'mindfulness', 'asana'],
+    bioRequired:  ['yoga', 'joga', 'instructor', 'instruktor'],
+    brandSignals: ['studio', 'centar', 'organization', 'official', 'škola', 'school'],
+  },
+  'business coach': {
+    searchTerms: ['business coach', 'biznis kouc', 'poslovni mentor', 'entrepreneur coach'],
+    bioKeywords:  ['coach', 'kouc', 'biznis', 'business', 'mentor', 'preduzetnik', 'entrepreneur', 'startup'],
+    bioRequired:  ['coach', 'kouc', 'mentor', 'business', 'biznis'],
+    brandSignals: ['agencija', 'kompanija', 'doo', 'ltd', 'organization', 'official', 'team'],
+  },
+  'photographer': {
+    searchTerms: ['fotograf', 'photographer', 'photography', 'fotografija'],
+    bioKeywords:  ['fotograf', 'photographer', 'photography', 'fotografija', 'foto', 'portret', 'portrait'],
+    bioRequired:  ['foto', 'photographer', 'photography'],
+    brandSignals: ['studio', 'agencija', 'organization', 'official', 'team'],
+  },
+  'makeup artist': {
+    searchTerms: ['makeup artist', 'šminker', 'šminkerka', 'mua beauty'],
+    bioKeywords:  ['makeup', 'šminka', 'mua', 'beauty', 'lashes', 'brows', 'artist'],
+    bioRequired:  ['makeup', 'šminka', 'mua', 'beauty', 'artist'],
+    brandSignals: ['studio', 'salon', 'organization', 'official', 'team', 'shop'],
+  },
+  'real estate agent': {
+    searchTerms: ['agent za nekretnine', 'real estate agent', 'prodaja nekretnina', 'broker nekretnine'],
+    bioKeywords:  ['nekretnine', 'real estate', 'agent', 'prodaja', 'broker', 'kuća', 'stan'],
+    bioRequired:  ['nekretnine', 'real estate', 'agent', 'broker'],
+    brandSignals: ['agencija', 'organization', 'official', 'team', 'group'],
+  },
+  'dentist': {
+    searchTerms: ['zubar', 'dentist', 'stomatolog', 'dental'],
+    bioKeywords:  ['zubar', 'dentist', 'stomatolog', 'dental', 'ortodont', 'implant', 'zubi'],
+    bioRequired:  ['zubar', 'dentist', 'stomatolog', 'dental'],
+    brandSignals: ['ordinacija', 'klinika', 'centar', 'organization', 'official', 'team'],
+  },
+  'therapist': {
+    searchTerms: ['psihoterapeut', 'psiholog', 'therapist', 'terapeut'],
+    bioKeywords:  ['terapeut', 'therapist', 'psiholog', 'psihoterapeut', 'therapy', 'terapija', 'mental health'],
+    bioRequired:  ['terapeut', 'therapist', 'psiholog', 'terapija'],
+    brandSignals: ['ordinacija', 'klinika', 'centar', 'organization', 'official', 'team'],
+  },
+  'interior designer': {
+    searchTerms: ['interior designer', 'enterijer dizajner', 'dizajn enterijera', 'interior design'],
+    bioKeywords:  ['enterijer', 'interior', 'dizajn', 'design', 'arhitekta', 'architect', 'dekor', 'decor'],
+    bioRequired:  ['enterijer', 'interior', 'dizajn', 'design'],
+    brandSignals: ['studio', 'agencija', 'organization', 'official', 'team', 'firma'],
+  },
+};
+
+// Vraća config za izabranu nišu ili generic fallback
+function getNicheConfig(niche) {
+  const nicheKey = niche.toLowerCase().trim();
+  // Direktan match
+  if (NICHE_CONFIG[nicheKey]) return NICHE_CONFIG[nicheKey];
+  // Partial match
+  for (const k of Object.keys(NICHE_CONFIG)) {
+    if (nicheKey.includes(k) || k.includes(nicheKey)) return NICHE_CONFIG[k];
+  }
+  // Generic fallback — koristiti nišu samu kao keyword
+  return {
+    searchTerms: [niche],
+    bioKeywords: niche.toLowerCase().split(/\s+/),
+    bioRequired: niche.toLowerCase().split(/\s+/).slice(0,2),
+    brandSignals: ['studio', 'agencija', 'organization', 'official', 'team', 'centar', 'klub'],
+  };
+}
+
+// ── Provjeri da li je username vjerojatno brend/organizacija ──
+function isBrandUsername(username) {
+  const u = username.toLowerCase();
+  // Brendirani pattern: sadrži ime + .services/.official/.team/.studio itd.
+  const brandSuffixes = [
+    /\.(studio|official|team|org|shop|store|academy|centar|center|clinic|school|gym|club|sport|group|federation|association|network|media|brand|academy|fitness(?!$))/,
+  ];
+  for (const re of brandSuffixes) {
+    if (re.test(u)) return true;
+  }
+  // Više od 2 tačke u username = često brend (npr. street.workout.serbia)
+  if ((u.match(/\./g) || []).length >= 2) return true;
+  // Dugačak username sa spojenim riječima koji liče na brend (>25 znakova sa tačkama)
+  if (u.length > 25 && u.includes('.')) return true;
+  return false;
+}
+
+// ── Provjeri relevantnost profila prema niši ──
+function isProfileRelevant(profile, nicheConfig) {
+  const bio = (profile.bio || '').toLowerCase();
+  const username = (profile.username || '').toLowerCase();
+  const displayName = (profile.displayName || '').toLowerCase();
+  const combined = `${bio} ${username} ${displayName}`;
+
+  // 1. Odbaci brendirane profile (osim ako niša sama nije brend-tip)
+  if (isBrandUsername(profile.username)) return false;
+
+  // 2. Provjeri da li se barem jedna obavezna ključna reč pojavljuje
+  const hasRequired = nicheConfig.bioRequired.some(kw => combined.includes(kw));
+
+  // 3. Provjeri koliko bio keyword-a se poklapa
+  const matchCount = nicheConfig.bioKeywords.filter(kw => combined.includes(kw)).length;
+
+  // Profil je relevantan ako ima obaveznu ključnu reč ILI barem 2 od bio keywords
+  return hasRequired || matchCount >= 2;
+}
+
+// ── Generiši search upite za datu nišu ──
+function buildIgSearchQueries(nicheConfig, niche, location, count) {
+  const queries = [];
+  const terms = nicheConfig.searchTerms;
+
+  // Primarni upiti sa svakim terminom
+  for (const term of terms) {
+    queries.push(`site:instagram.com "${term}" ${location}`);
+  }
+
+  // Upiti sa link/forma filterima
+  queries.push(`site:instagram.com "${terms[0]}" ${location} typeform OR forms.gle OR jotform OR "link in bio"`);
+  queries.push(`site:instagram.com "${terms[0]}" ${location} linktr.ee OR bio.site OR beacons`);
+
+  // Upiti bez lokacije ako ima malo rezultata (šira mreža)
+  if (terms.length > 1) {
+    queries.push(`site:instagram.com "${terms[1]}" ${location} coaching OR online`);
+  }
+
+  // Slobodan niche termin bez navodnika za širi ulov
+  queries.push(`site:instagram.com ${niche} ${location} trainer OR coach OR trener`);
+
+  return queries;
+}
+
+// Niche chip selection
+document.querySelectorAll('.niche-chip').forEach(chip => {
+  chip.addEventListener('click', () => {
+    document.querySelectorAll('.niche-chip').forEach(c => c.classList.remove('active'));
+    chip.classList.add('active');
+    selectedNiche = chip.dataset.niche;
+    $('ig-custom-field').style.display = selectedNiche === 'custom' ? 'block' : 'none';
+  });
+});
+
+function setIgFilter(f, btn) {
+  igFilter = f;
+  document.querySelectorAll('.pill-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderIgCards();
+}
+
+function igShowAlert(msg, type) { $('ig-alert-box').innerHTML=`<div class="alert alert-${type}">${msg}</div>`; }
+function igClearAlert() { $('ig-alert-box').innerHTML=''; }
+function igSetProgress(p, txt) {
+  $('ig-prog-fill').style.width=(Math.min(p,1)*100).toFixed(1)+'%';
+  $('ig-status-text').textContent=txt;
+}
+
+// Detect form links — typeform, forms.gle, jotform, tally, cognito, paperform, wufoo, surveymonkey itd
+function detectForm(text) {
+  if (!text) return '';
+  const formPattern = /https?:\/\/[^\s"'<>]*(?:typeform\.com|forms\.gle|jotform\.com|tally\.so|cognito\.com|paperform\.co|wufoo\.com|surveymonkey\.com|airtable\.com\/shr|notion\.so\/[^\s]*form|fillout\.com)[^\s"'<>]*/i;
+  const m = text.match(formPattern);
+  return m ? m[0].replace(/[.,;)>]+$/, '') : '';
+}
+
+// Detect any external link (not instagram.com itself)
+function detectLink(text) {
+  if (!text) return '';
+  const urls = [...text.matchAll(/https?:\/\/(?!(?:www\.)?instagram\.com)[^\s"'<>]+/gi)];
+  if (!urls.length) return '';
+  // Preferiraj poznate link-in-bio servise i forme
+  const priority = urls.find(m => /typeform|forms\.gle|jotform|tally\.so|linktr\.ee|bio\.site|linkin\.bio|beacons|bento\.me|carrd|koji\.to|stan\.store|msha\.ke|later\.com\/bio|lnk\.bio/i.test(m[0]));
+  const result = priority || urls[0];
+  return result[0].replace(/[.,;)>]+$/, '');
+}
+
+// Izvuci sve tekstove iz SerpAPI rezultata
+function extractAllText(r) {
+  const parts = [
+    r.snippet || '',
+    r.title || '',
+    JSON.stringify(r.rich_snippet || {}),
+    JSON.stringify(r.sitelinks || {}),
+    (r.rich_snippet?.top?.extensions || []).join(' '),
+    (r.rich_snippet?.bottom?.extensions || []).join(' '),
+  ];
+  return parts.join(' ');
+}
+
+// Classify: 'typeform', 'link', 'neither'
+function classifyProfile(profile) {
+  if (profile.formUrl || /typeform|forms\.gle|jotform|tally\.so/i.test(profile.externalUrl||'')) return 'typeform';
+  if (profile.externalUrl) return 'link';
+  return 'neither';
+}
+
+// Fetch Linktree page and extract links
+async function fetchLinktreeLinks(ltUrl) {
+  try {
+    const resp = await fetch(CORS_PROXY + encodeURIComponent(ltUrl), { signal: AbortSignal.timeout(8000) });
+    if (!resp.ok) return [];
+    const html = await resp.text();
+    // Extract all href links from Linktree HTML
+    const matches = [...html.matchAll(/href="(https?:\/\/[^"]+)"/gi)];
+    const links = [...new Set(
+      matches.map(m => m[1])
+        .filter(u => !u.includes('instagram.com') && !u.includes('linktr.ee') && !u.includes('facebook.com/tr'))
+    )];
+    return links.slice(0, 10);
+  } catch(_) { return []; }
+}
+
+// ── Saved profiles (localStorage) ──
+let savedIgUsernames = new Set(JSON.parse(localStorage.getItem('ig_saved_usernames') || '[]'));
+let savedIgProfiles  = JSON.parse(localStorage.getItem('ig_saved_profiles') || '[]');
+
+function saveIgResults() {
+  if (!igData.length) return;
+  let added = 0;
+  for (const p of igData) {
+    if (!savedIgUsernames.has(p.username.toLowerCase())) {
+      savedIgUsernames.add(p.username.toLowerCase());
+      savedIgProfiles.push(p);
+      added++;
+    }
+  }
+  localStorage.setItem('ig_saved_usernames', JSON.stringify([...savedIgUsernames]));
+  localStorage.setItem('ig_saved_profiles',  JSON.stringify(savedIgProfiles));
+  updateSavedMetric();
+  igShowAlert(`✅ Sačuvano ${added} novih profila (duplikati preskočeni). Ukupno sačuvano: ${savedIgProfiles.length}.`, 'success');
+}
+
+function loadSavedIg() {
+  if (!savedIgProfiles.length) { igShowAlert('ℹ️ Nema sačuvanih profila.', 'info'); return; }
+  igData = [...savedIgProfiles];
+  updateIgMetrics();
+  renderIgCards();
+  $('ig-results-section').style.display = 'block';
+  igShowAlert(`📂 Učitano ${igData.length} sačuvanih profila.`, 'info');
+}
+
+function clearSavedIg() {
+  if (!confirm('Obrisati sve sačuvane profile?')) return;
+  savedIgUsernames = new Set();
+  savedIgProfiles  = [];
+  localStorage.removeItem('ig_saved_usernames');
+  localStorage.removeItem('ig_saved_profiles');
+  updateSavedMetric();
+  igShowAlert('🗑 Sačuvani profili obrisani.', 'warning');
+}
+
+function updateSavedMetric() {
+  const el = $('igm-saved');
+  if (el) el.textContent = savedIgProfiles.length;
+}
+
+async function startIgSearch() {
+  const apiKey = getKey('serpapi');
+  if (!apiKey) { igShowAlert('⚠️ Nema SerpAPI ključeva. Dodaj ih u <button onclick="setMode(\'keys\')" style="background:none;border:none;color:var(--accent2);cursor:pointer;font-size:inherit;padding:0;font-family:inherit;font-weight:600;">🔑 API Ključevi →</button>', 'warning'); return; }
+
+  const niche      = selectedNiche === 'custom' ? $('ig-custom-niche').value.trim() : selectedNiche;
+  const countryVal = $('ig-country').value;
+  const [gl, hl]   = countryVal.split('|');
+  const countryNames = {'rs':'Serbia','hr':'Croatia','ba':'Bosnia','si':'Slovenia','me':'Montenegro','us':'USA','gb':'UK','de':'Germany','au':'Australia','ca':'Canada'};
+  const countryName  = countryNames[gl] || gl;
+  const city     = $('ig-city').value.trim();
+  const location = city ? `${city}, ${countryName}` : countryName;
+  const count    = parseInt($('ig-count').value);
+
+  if (!niche) { igShowAlert('⚠️ Unesi nišu.', 'warning'); return; }
+
+  // Uzmi niche config za filtriranje
+  const nicheConfig = getNicheConfig(niche);
+
+  igClearAlert();
+  igData = [];
+  $('ig-results-section').style.display = 'none';
+  $('ig-search-btn').disabled = true;
+  $('ig-status-box').style.display = 'block';
+  igSetProgress(0, 'Pretražujem Instagram profile...');
+
+  try {
+    const profiles  = [];
+    const seen      = new Set([...savedIgUsernames]);
+    let skippedBrand = 0;
+    let skippedIrrelevant = 0;
+
+    // Generiši specifične upite za ovu nišu
+    const queries = buildIgSearchQueries(nicheConfig, niche, location, count);
+    let pagesDone = 0;
+    const totalSteps = queries.length * 2; // max 2 stranice po upitu
+
+    for (const q of queries) {
+      if (profiles.length >= count) break;
+      for (let start = 0; start < 20; start += 10) {
+        if (profiles.length >= count) break;
+        const progress = pagesDone / totalSteps;
+        igSetProgress(progress, `🔍 Pretraga: ${profiles.length} pronađenih, ${skippedBrand + skippedIrrelevant} filtriranih · ${sessionStats.serpapi.calls} API poziva`);
+        showTokenCounter('ig-token-counter', 'serpapi');
+
+        const data = await keyedFetch('serpapi', SERPAPI_BASE,
+          key => new URLSearchParams({ engine:'google', q, num:'10', start:String(start), api_key:key, gl, hl })
+        );
+        if (data.error && !/credits|limit|quota|exceeded|insufficient/i.test(data.error))
+          throw new Error('SerpAPI: ' + data.error);
+
+        for (const r of data.organic_results || []) {
+          const link = r.link || '';
+          if (!link.includes('instagram.com/')) continue;
+
+          const match = link.match(/instagram\.com\/([^/?#]+)/);
+          if (!match) continue;
+          const username = match[1];
+
+          // Preskoči sistemske IG stranice
+          if (['p','reel','explore','tags','stories','accounts','tv','_u','about','help'].includes(username)) continue;
+          // Preskoči već viđene
+          if (seen.has(username.toLowerCase())) continue;
+
+          const allText    = extractAllText(r);
+          const snippet    = r.snippet || '';
+          const title      = r.title   || '';
+          const displayName = title.replace(/\s*\(@?[^)]*\)/,'').replace(/\s*[·\-|].*$/,'').trim() || username;
+
+          const bio = snippet
+            .replace(/\d+[KkMmBb]?\s*(Followers|Following|Posts|likes?|comments?)[^·.\n]*/gi, '')
+            .replace(/·/g, ' ').trim();
+
+          // ── FILTER 1: Brendirani username (npr. street.workout.serbia) ──
+          if (isBrandUsername(username)) {
+            skippedBrand++;
+            seen.add(username.toLowerCase()); // ne vraćaj isti username
+            continue;
+          }
+
+          // ── FILTER 2: Relevantnost prema niši ──
+          const profileDraft = { username, displayName, bio };
+          if (!isProfileRelevant(profileDraft, nicheConfig)) {
+            skippedIrrelevant++;
+            seen.add(username.toLowerCase());
+            continue;
+          }
+
+          seen.add(username.toLowerCase());
+
+          const formUrl     = detectForm(allText);
+          const externalUrl = formUrl || detectLink(allText);
+
+          // Ako je linktr.ee — fetch linkovi
+          let linktreeLinks = [];
+          if (/linktr\.ee/i.test(externalUrl)) {
+            igSetProgress(progress, `🌳 Otvaram Linktree za @${username}...`);
+            linktreeLinks = await fetchLinktreeLinks(externalUrl);
+            const ltText  = linktreeLinks.join(' ');
+            const ltForm  = detectForm(ltText);
+            const ltLink  = detectLink(ltText);
+            const enriched = ltForm || ltLink || externalUrl;
+            profiles.push({
+              username, displayName,
+              igUrl: `https://www.instagram.com/${username}/`,
+              bio,
+              externalUrl: enriched,
+              formUrl: ltForm || formUrl,
+              linktreeUrl: externalUrl,
+              linktreeLinks,
+              category: classifyProfile({ externalUrl: enriched, formUrl: ltForm || formUrl }),
+              nicheMatch: true,
+            });
+          } else {
+            profiles.push({
+              username, displayName,
+              igUrl: `https://www.instagram.com/${username}/`,
+              bio, externalUrl, formUrl,
+              linktreeUrl: '', linktreeLinks: [],
+              category: classifyProfile({ externalUrl, formUrl }),
+              nicheMatch: true,
+            });
+          }
+
+          if (profiles.length >= count) break;
+        }
+        pagesDone++;
+        // Ako nema rezultata na prvoj stranici, preskoči drugu za taj upit
+        if (start === 0 && (data.organic_results || []).filter(r => r.link?.includes('instagram.com/')).length < 3) break;
+        await sleep(400);
+      }
+    }
+
+    igData = profiles;
+    $('ig-status-box').style.display = 'none';
+
+    if (!igData.length) {
+      const skipMsg = skippedBrand + skippedIrrelevant > 0
+        ? ` (${skippedBrand} brendiranih + ${skippedIrrelevant} irelevantnih preskočeno)`
+        : '';
+      igShowAlert(`ℹ️ Nijedan relevantan profil nije pronađen${skipMsg}. Probaj drugu nišu, grad ili državu.`, 'info');
+      $('ig-search-btn').disabled = false;
+      return;
+    }
+
+    // Prikaži info o filtriranju
+    if (skippedBrand + skippedIrrelevant > 0) {
+      igShowAlert(`✅ Filtrirano: ${skippedBrand} brendiranih profila + ${skippedIrrelevant} irelevantnih preskočeno. Prikazujem ${igData.length} relevantnih personalnih profila.`, 'success');
+    }
+
+    // AI scoring (opciono)
+    if ($('use-ai-scoring').checked) {
+      const aiSvc = selectedAiModel;
+      if (!getActiveKey(aiSvc)) {
+        igShowAlert(`⚠️ AI ocenjivanje uključeno ali nema ${aiSvc === 'gemini' ? 'Gemini' : 'OpenRouter'} ključa. Dodaj ga u 🔑 API Ključevi.`, 'warning');
+      } else {
+        $('ig-status-box').style.display = 'block';
+        igData = await runAIScoring(igData, niche, countryName);
+        $('ig-status-box').style.display = 'none';
+        // Ukloni AI-ocijenjene profile s ocjenom < 3 (potpuno irelevantni)
+        const before = igData.length;
+        igData = igData.filter(p => !p.aiScore || p.aiScore >= 3);
+        const removedByAI = before - igData.length;
+        const scored = igData.filter(p => p.aiScore > 0);
+        if (scored.length) {
+          const avg = (scored.reduce((s,p)=>s+(p.aiScore||0),0)/scored.length).toFixed(1);
+          $('igm-ai-avg').textContent = avg;
+          $('igm-ai-card').style.display = 'block';
+        }
+        if (removedByAI > 0) {
+          igShowAlert(`🤖 AI je uklonio ${removedByAI} irelevantnih profila (ocena < 3). Ostalo: ${igData.length} profila.`, 'info');
+        }
+      }
+    }
+
+    updateIgMetrics();
+    renderIgCards();
+    $('ig-results-section').style.display = 'block';
+
+  } catch(err) {
+    $('ig-status-box').style.display = 'none';
+    igShowAlert('❌ ' + err.message, 'error');
+  }
+  $('ig-search-btn').disabled = false;
+}
+
+function updateIgMetrics() {
+  $('igm-total').textContent    = igData.length;
+  $('igm-link').textContent     = igData.filter(p => p.category === 'link').length;
+  $('igm-typeform').textContent = igData.filter(p => p.category === 'typeform').length;
+  $('igm-neither').textContent  = igData.filter(p => p.category === 'neither').length;
+  updateSavedMetric();
+}
+
+function renderIgCards() {
+  const filtered = igFilter === 'all' ? igData : igData.filter(p => p.category === igFilter);
+  const grid = $('ig-profiles-grid');
+  grid.innerHTML = '';
+
+  if (!filtered.length) {
+    grid.innerHTML = `<p style="color:var(--muted);font-size:0.85rem;padding:1rem 0;">Nema profila za ovaj filter.</p>`;
+    return;
+  }
+
+  filtered.forEach(p => {
+    const isSaved = savedIgUsernames.has(p.username.toLowerCase());
+    const tagHtml = p.category === 'typeform'
+      ? `<span class="ig-tag ig-tag-typeform">📋 Forma</span>`
+      : p.category === 'link'
+      ? `<span class="ig-tag ig-tag-link">🔗 Link</span>`
+      : `<span class="ig-tag ig-tag-none">Bez linka</span>`;
+
+    // AI score badge
+    const aiHtml = p.aiScore > 0
+      ? `<span style="display:inline-flex;align-items:center;gap:0.25rem;background:${p.aiScore>=7?'rgba(34,197,94,0.12)':p.aiScore>=4?'rgba(234,179,8,0.1)':'rgba(239,68,68,0.08)'};border:1px solid ${p.aiScore>=7?'rgba(34,197,94,0.3)':p.aiScore>=4?'rgba(234,179,8,0.25)':'rgba(239,68,68,0.2)'};border-radius:6px;padding:0.15rem 0.5rem;font-size:0.72rem;font-weight:700;color:${p.aiScore>=7?'#86efac':p.aiScore>=4?'#fde047':'#fca5a5'};">🤖 ${p.aiScore}/10</span>`
+      : '';
+    const aiReason = p.aiReason ? `<div style="font-size:0.72rem;color:var(--muted);margin-top:0.3rem;font-style:italic;">${esc(p.aiReason)}</div>` : '';
+
+    const formBtn = p.formUrl
+      ? `<a class="ig-link-btn ext" href="${esc(p.formUrl)}" target="_blank">📋 Forma</a>`
+      : '';
+    const extBtn = (!p.formUrl && p.externalUrl)
+      ? `<a class="ig-link-btn ext" href="${esc(p.externalUrl)}" target="_blank">${/linktr\.ee/i.test(p.externalUrl)?'🌳 Linktree':'� Link'}</a>`
+      : '';
+
+    // Linktree extracted links
+    const ltLinks = (p.linktreeLinks||[]).length
+      ? `<div style="margin-top:0.5rem;display:flex;flex-wrap:wrap;gap:0.3rem;">
+          ${p.linktreeLinks.map(l=>`<a href="${esc(l)}" target="_blank" class="ig-link-btn view" style="font-size:0.68rem;padding:0.2rem 0.5rem;overflow:hidden;max-width:200px;white-space:nowrap;text-overflow:ellipsis;">${esc(l.replace(/^https?:\/\//,'').substring(0,30))}…</a>`).join('')}
+         </div>`
+      : '';
+
+    const card = document.createElement('div');
+    card.className = 'ig-profile-card' + (isSaved ? ' active-key' : '');
+    card.innerHTML = `
+      <div class="ig-profile-top">
+        <div class="ig-avatar">📸</div>
+        <div style="flex:1;">
+          <div class="ig-username">${esc(p.displayName)} ${aiHtml}</div>
+          <div class="ig-handle">@${esc(p.username)}</div>
+        </div>
+        ${isSaved ? '<span style="font-size:0.7rem;color:var(--green);">✓ sačuvan</span>' : ''}
+      </div>
+      ${p.bio ? `<div class="ig-bio">${esc(p.bio)}</div>` : ''}
+      ${aiReason}
+      <div class="ig-tags">${tagHtml}</div>
+      ${ltLinks}
+      <div class="ig-links">
+        <a class="ig-link-btn view" href="${esc(p.igUrl)}" target="_blank">👁 Profil</a>
+        ${p.linktreeUrl ? `<a class="ig-link-btn view" href="${esc(p.linktreeUrl)}" target="_blank">🌳 Linktree</a>` : ''}
+        ${formBtn}${extBtn}
+      </div>`;
+    grid.appendChild(card);
+  });
+}
+
+function downloadIgCSV() {
+  if (!igData.length) return;
+  const hdr = ['Username','Ime','Instagram URL','Bio','External Link','Forma URL','Linktree Links','Kategorija'];
+  const rows = igData.map(p => [
+    p.username, p.displayName, p.igUrl, p.bio,
+    p.externalUrl, p.formUrl||'',
+    (p.linktreeLinks||[]).join(' | '),
+    p.category
+  ].map(csvCell).join(','));
+  const csv = '\uFEFF' + [hdr.join(','), ...rows].join('\r\n');
+  const countryVal = $('ig-country').value.split('|')[0];
+  const city = $('ig-city').value.trim();
+  const a = Object.assign(document.createElement('a'), {
+    href: URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'})),
+    download: `instagram_${selectedNiche}_${countryVal}${city?'_'+city:''}.csv`.replace(/\s+/g,'_')
+  });
+  a.click();
+}
+</script>
+</body>
+</html>
