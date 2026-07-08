@@ -1679,76 +1679,100 @@ let selectedNiche = 'fitness trainer';
 // ── Niche config: srpski/engleski ključne reči, brendirani signal reči ──
 const NICHE_CONFIG = {
   'fitness trainer': {
-    searchTerms: ['personal trainer', 'fitness trener', 'personalni trener', 'pt coach'],
-    bioKeywords:  ['trener', 'trainer', 'fitness', 'personal', 'coaching', 'workout', 'gym', 'vežbanje', 'transformacija', 'body', 'kondicioniranje'],
-    bioRequired:  ['trener', 'trainer', 'fitness', 'coach', 'pt', 'personal', 'vežbanje', 'gym', 'kondic'],
-    brandSignals: ['studio', 'gym', 'centar', 'akademija', 'klub', 'school', 'organization', 'official', 'team', 'federation'],
+    searchTerms:   ['personalni trener', 'fitness trener', 'personal trainer', 'fitness coach', 'pt trener'],
+    hashtagTerms:  ['fitnesstrener', 'personalnitrener', 'fitnesssrbija', 'treningzagreb', 'fitnesshrvatska', 'personaltrainer', 'fitnesskuca', 'trenerfit', 'fitnessbeograd', 'gymlife'],
+    bioKeywords:   ['trener', 'trainer', 'coaching', 'workout', 'transformacija', 'body', 'kondicioniranje', 'vežbanje', 'vezbanje', 'trening', 'pt ', ' pt', 'coach'],
+    bioRequired:   ['trener', 'trainer', 'coach', 'pt'],
+    brandSignals:  ['gym', 'teretana', 'centar', 'klub', 'studio', 'akademija', 'official', 'team', 'ekipa'],
+    strictMode:    true,
   },
   'personal trainer': {
-    searchTerms: ['personal trainer', 'personalni trener', 'pt coach', 'fitness coach'],
-    bioKeywords:  ['personal', 'trener', 'trainer', 'fitness', 'coaching', 'transformation', 'body', 'workout'],
-    bioRequired:  ['personal', 'trener', 'trainer', 'coach', 'pt', 'fitness'],
-    brandSignals: ['studio', 'gym', 'centar', 'akademija', 'klub', 'school', 'organization', 'official', 'team'],
+    searchTerms:   ['personalni trener', 'personal trainer', 'pt coach', 'fitness coach', 'fitness trener'],
+    hashtagTerms:  ['personalnitrener', 'personaltrainer', 'fitnesstrener', 'fitnesssrbija', 'trenerfit', 'fitnessbeograd', 'treningzagreb', 'ptlife', 'fitnesscoach', 'gymcoach'],
+    bioKeywords:   ['personal', 'trener', 'trainer', 'fitness', 'coaching', 'transformation', 'body', 'workout', 'trening', 'pt '],
+    bioRequired:   ['trener', 'trainer', 'coach', 'pt'],
+    brandSignals:  ['gym', 'teretana', 'centar', 'klub', 'studio', 'akademija', 'official', 'team'],
+    strictMode:    true,
   },
   'life coach': {
-    searchTerms: ['life coach', 'lajf kouc', 'motivacioni govornik', 'personal development'],
-    bioKeywords:  ['coach', 'kouc', 'mentoring', 'motivacija', 'razvoj', 'transformation', 'mindset'],
-    bioRequired:  ['coach', 'kouc', 'mentor', 'motivac'],
-    brandSignals: ['agencija', 'studio', 'organization', 'official', 'team', 'centar'],
+    searchTerms:   ['life coach', 'lajf kouc', 'motivacioni govornik', 'personal development coach'],
+    hashtagTerms:  ['lifecoach', 'lajfkouc', 'motivacija', 'personaldevelopment', 'mindsetcoach', 'selfimprovement'],
+    bioKeywords:   ['coach', 'kouc', 'mentoring', 'motivacija', 'razvoj', 'transformation', 'mindset', 'mentor'],
+    bioRequired:   ['coach', 'kouc', 'mentor', 'motivac'],
+    brandSignals:  ['agencija', 'studio', 'organization', 'official', 'team', 'centar'],
+    strictMode:    false,
   },
   'nutritionist': {
-    searchTerms: ['nutricionist', 'nutritionist', 'dijetetičar', 'ishrana coach'],
-    bioKeywords:  ['nutricionist', 'nutritionist', 'ishrana', 'dijeta', 'dijetetičar', 'nutrition', 'zdrava ishrana'],
-    bioRequired:  ['nutricionist', 'nutritionist', 'ishrana', 'dijeta', 'nutrition'],
-    brandSignals: ['klinika', 'centar', 'ordinacija', 'studio', 'organization', 'official'],
+    searchTerms:   ['nutricionist', 'nutritionist', 'dijetetičar', 'dijeteticar', 'ishrana coach'],
+    hashtagTerms:  ['nutricionist', 'nutritionist', 'zdravaishrana', 'dijeta', 'nutricionista', 'ishrana'],
+    bioKeywords:   ['nutricionist', 'nutritionist', 'ishrana', 'dijeta', 'dijetetičar', 'nutrition', 'zdrava ishrana'],
+    bioRequired:   ['nutricionist', 'nutritionist', 'ishrana', 'dijeta', 'nutrition'],
+    brandSignals:  ['klinika', 'centar', 'ordinacija', 'studio', 'organization', 'official'],
+    strictMode:    false,
   },
   'yoga instructor': {
-    searchTerms: ['yoga instruktor', 'yoga instructor', 'joga učitelj', 'yoga teacher'],
-    bioKeywords:  ['yoga', 'joga', 'instructor', 'instruktor', 'meditation', 'meditacija', 'mindfulness', 'asana'],
-    bioRequired:  ['yoga', 'joga', 'instructor', 'instruktor'],
-    brandSignals: ['studio', 'centar', 'organization', 'official', 'škola', 'school'],
+    searchTerms:   ['yoga instruktor', 'yoga instructor', 'joga učitelj', 'joga ucitelj', 'yoga teacher'],
+    hashtagTerms:  ['yogainstruktor', 'yogasrbija', 'jogasrbija', 'yogabeograd', 'yogazagreb', 'yogalife'],
+    bioKeywords:   ['yoga', 'joga', 'instructor', 'instruktor', 'meditation', 'meditacija', 'mindfulness', 'asana'],
+    bioRequired:   ['yoga', 'joga', 'instructor', 'instruktor'],
+    brandSignals:  ['studio', 'centar', 'organization', 'official', 'škola', 'school'],
+    strictMode:    false,
   },
   'business coach': {
-    searchTerms: ['business coach', 'biznis kouc', 'poslovni mentor', 'entrepreneur coach'],
-    bioKeywords:  ['coach', 'kouc', 'biznis', 'business', 'mentor', 'preduzetnik', 'entrepreneur', 'startup'],
-    bioRequired:  ['coach', 'kouc', 'mentor', 'business', 'biznis'],
-    brandSignals: ['agencija', 'kompanija', 'doo', 'ltd', 'organization', 'official', 'team'],
+    searchTerms:   ['business coach', 'biznis kouc', 'poslovni mentor', 'entrepreneur coach', 'startup coach'],
+    hashtagTerms:  ['businesscoach', 'bizniskouc', 'poslovnimentor', 'entrepreneurship', 'startupcoach'],
+    bioKeywords:   ['coach', 'kouc', 'biznis', 'business', 'mentor', 'preduzetnik', 'entrepreneur', 'startup'],
+    bioRequired:   ['coach', 'kouc', 'mentor', 'business', 'biznis'],
+    brandSignals:  ['agencija', 'kompanija', 'doo', 'ltd', 'organization', 'official', 'team'],
+    strictMode:    false,
   },
   'photographer': {
-    searchTerms: ['fotograf', 'photographer', 'photography', 'fotografija'],
-    bioKeywords:  ['fotograf', 'photographer', 'photography', 'fotografija', 'foto', 'portret', 'portrait'],
-    bioRequired:  ['foto', 'photographer', 'photography'],
-    brandSignals: ['studio', 'agencija', 'organization', 'official', 'team'],
+    searchTerms:   ['fotograf', 'photographer', 'photography', 'fotografija'],
+    hashtagTerms:  ['fotograf', 'fotografijasrbija', 'photographyserbia', 'portraitphotography', 'weddingphotographer'],
+    bioKeywords:   ['fotograf', 'photographer', 'photography', 'fotografija', 'foto', 'portret', 'portrait'],
+    bioRequired:   ['foto', 'photographer', 'photography'],
+    brandSignals:  ['studio', 'agencija', 'organization', 'official', 'team'],
+    strictMode:    false,
   },
   'makeup artist': {
-    searchTerms: ['makeup artist', 'šminker', 'šminkerka', 'mua beauty'],
-    bioKeywords:  ['makeup', 'šminka', 'mua', 'beauty', 'lashes', 'brows', 'artist'],
-    bioRequired:  ['makeup', 'šminka', 'mua', 'beauty', 'artist'],
-    brandSignals: ['studio', 'salon', 'organization', 'official', 'team', 'shop'],
+    searchTerms:   ['makeup artist', 'šminker', 'sminker', 'šminkerka', 'sminkerka', 'mua beauty'],
+    hashtagTerms:  ['makeupartist', 'makeupsrbija', 'sminker', 'muaserbia', 'beautyartist', 'makeupartistbelgrade'],
+    bioKeywords:   ['makeup', 'šminka', 'sminka', 'mua', 'beauty', 'lashes', 'brows', 'artist'],
+    bioRequired:   ['makeup', 'šminka', 'sminka', 'mua', 'beauty', 'artist'],
+    brandSignals:  ['studio', 'salon', 'organization', 'official', 'team', 'shop'],
+    strictMode:    false,
   },
   'real estate agent': {
-    searchTerms: ['agent za nekretnine', 'real estate agent', 'prodaja nekretnina', 'broker nekretnine'],
-    bioKeywords:  ['nekretnine', 'real estate', 'agent', 'prodaja', 'broker', 'kuća', 'stan'],
-    bioRequired:  ['nekretnine', 'real estate', 'agent', 'broker'],
-    brandSignals: ['agencija', 'organization', 'official', 'team', 'group'],
+    searchTerms:   ['agent za nekretnine', 'real estate agent', 'prodaja nekretnina', 'broker nekretnine'],
+    hashtagTerms:  ['nekretnine', 'realestate', 'agentnekretnine', 'prodajanekretnina', 'nekretninebeograd'],
+    bioKeywords:   ['nekretnine', 'real estate', 'agent', 'prodaja', 'broker', 'kuća', 'stan'],
+    bioRequired:   ['nekretnine', 'real estate', 'agent', 'broker'],
+    brandSignals:  ['agencija', 'organization', 'official', 'team', 'group'],
+    strictMode:    false,
   },
   'dentist': {
-    searchTerms: ['zubar', 'dentist', 'stomatolog', 'dental'],
-    bioKeywords:  ['zubar', 'dentist', 'stomatolog', 'dental', 'ortodont', 'implant', 'zubi'],
-    bioRequired:  ['zubar', 'dentist', 'stomatolog', 'dental'],
-    brandSignals: ['ordinacija', 'klinika', 'centar', 'organization', 'official', 'team'],
+    searchTerms:   ['zubar', 'dentist', 'stomatolog', 'dental'],
+    hashtagTerms:  ['zubar', 'stomatolog', 'dentist', 'dentalbeograd', 'zubarsrbija', 'ortodont'],
+    bioKeywords:   ['zubar', 'dentist', 'stomatolog', 'dental', 'ortodont', 'implant', 'zubi'],
+    bioRequired:   ['zubar', 'dentist', 'stomatolog', 'dental'],
+    brandSignals:  ['ordinacija', 'klinika', 'centar', 'organization', 'official', 'team'],
+    strictMode:    false,
   },
   'therapist': {
-    searchTerms: ['psihoterapeut', 'psiholog', 'therapist', 'terapeut'],
-    bioKeywords:  ['terapeut', 'therapist', 'psiholog', 'psihoterapeut', 'therapy', 'terapija', 'mental health'],
-    bioRequired:  ['terapeut', 'therapist', 'psiholog', 'terapija'],
-    brandSignals: ['ordinacija', 'klinika', 'centar', 'organization', 'official', 'team'],
+    searchTerms:   ['psihoterapeut', 'psiholog', 'therapist', 'terapeut'],
+    hashtagTerms:  ['psihoterapeut', 'psiholog', 'mentalnozdravlje', 'therapist', 'terapija'],
+    bioKeywords:   ['terapeut', 'therapist', 'psiholog', 'psihoterapeut', 'therapy', 'terapija', 'mental health'],
+    bioRequired:   ['terapeut', 'therapist', 'psiholog', 'terapija'],
+    brandSignals:  ['ordinacija', 'klinika', 'centar', 'organization', 'official', 'team'],
+    strictMode:    false,
   },
   'interior designer': {
-    searchTerms: ['interior designer', 'enterijer dizajner', 'dizajn enterijera', 'interior design'],
-    bioKeywords:  ['enterijer', 'interior', 'dizajn', 'design', 'arhitekta', 'architect', 'dekor', 'decor'],
-    bioRequired:  ['enterijer', 'interior', 'dizajn', 'design'],
-    brandSignals: ['studio', 'agencija', 'organization', 'official', 'team', 'firma'],
+    searchTerms:   ['interior designer', 'enterijer dizajner', 'dizajner enterijera', 'interior design'],
+    hashtagTerms:  ['enterijerdizajn', 'interiordesign', 'dizajnenterijera', 'interiordesignserbia', 'homedecor'],
+    bioKeywords:   ['enterijer', 'interior', 'dizajn', 'design', 'arhitekta', 'architect', 'dekor', 'decor'],
+    bioRequired:   ['enterijer', 'interior', 'dizajn', 'design'],
+    brandSignals:  ['studio', 'agencija', 'organization', 'official', 'team', 'firma'],
+    strictMode:    false,
   },
 };
 
@@ -1770,64 +1794,100 @@ function getNicheConfig(niche) {
   };
 }
 
-// ── Provjeri da li je username vjerojatno brend/organizacija ──
+// ── TASK 4: Provjeri da li je username brend/organizacija (striktiji) ──
 function isBrandUsername(username) {
   const u = username.toLowerCase();
-  // Brendirani pattern: sadrži ime + .services/.official/.team/.studio itd.
-  const brandSuffixes = [
-    /\.(studio|official|team|org|shop|store|academy|centar|center|clinic|school|gym|club|sport|group|federation|association|network|media|brand|academy|fitness(?!$))/,
-  ];
-  for (const re of brandSuffixes) {
-    if (re.test(u)) return true;
-  }
-  // Više od 2 tačke u username = često brend (npr. street.workout.serbia)
+
+  // Eksplicitni brend sufiksi u usernameu
+  if (/\.(studio|official|team|org|shop|store|academy|centar|center|clinic|school|gym|club|sport|group|federation|association|network|media|brand|srbija|croatia|serbia|bosna|slovenija|beograd|zagreb|sarajevo|novi\.sad)$/.test(u)) return true;
+
+  // Keyword koji jasno označava organizaciju/brend UNUTAR usernamea
+  if (/(gym|teretana|fitnesscenter|fitnessclub|fitnessstudio|megagym|crossfit(?!coach|trener)|sportkluб|sportclub|sportcentar|akademija|federation|savez|liga|team(?!coach)|ekipa|official|srb$|rs$|srbija|croatia|serbia)/.test(u)) return true;
+
+  // Više od 2 tačke = organizacioni username (street.workout.serbia)
   if ((u.match(/\./g) || []).length >= 2) return true;
-  // Dugačak username sa spojenim riječima koji liče na brend (>25 znakova sa tačkama)
-  if (u.length > 25 && u.includes('.')) return true;
+
+  // Kombinacija: dugi username SA tačkom i geografskim/brend sufisksom
+  if (u.length > 22 && /\.(rs|sr|gym|fit|sport|srbija|beograd)/.test(u)) return true;
+
   return false;
 }
 
-// ── Provjeri relevantnost profila prema niši ──
-function isProfileRelevant(profile, nicheConfig) {
-  const bio = (profile.bio || '').toLowerCase();
-  const username = (profile.username || '').toLowerCase();
-  const displayName = (profile.displayName || '').toLowerCase();
-  const combined = `${bio} ${username} ${displayName}`;
+// ── TASK 1: Bio blacklist — reči koje jasno označavaju brend/gym, ne osobu ──
+const BIO_BLACKLIST = [
+  // Gym / teretana / studio brendovi
+  'teretana', 'fitness centar', 'fitness center', 'gym ', ' gym', 'crossfit box',
+  'sport centar', 'sport club', 'sportski centar', 'fitnes centar',
+  // Organizacije
+  'tim trenera', 'naš tim', 'ekipa', 'više trenera', 'vise trenera',
+  'akademija', 'škola fitnesa', 'skola fitnesa', 'fitnes škola',
+  // Specifično za metal/nakit/nesrodne niše
+  'nakit', 'jewelry', 'jewellery', 'metal ', ' metal', 'gold ', 'silver ',
+  'dragulj', 'prsten', 'ogrlica', 'narukvica', 'srebrni', 'zlatni',
+  // Opšti brend signali u bio-u
+  'zvanični nalog', 'official account', 'official page', 'fan page',
+  'kontakt:', 'info@', 'radno vreme', 'radno vrijeme', 'working hours',
+];
 
-  // 1. Odbaci brendirane profile (osim ako niša sama nije brend-tip)
+// ── TASK 1: Provjeri relevantnost profila prema niši (striktije) ──
+function isProfileRelevant(profile, nicheConfig) {
+  const bio       = (profile.bio         || '').toLowerCase();
+  const username  = (profile.username    || '').toLowerCase();
+  const dispName  = (profile.displayName || '').toLowerCase();
+  const combined  = `${bio} ${username} ${dispName}`;
+
+  // 1. Odbaci brendirane username-e
   if (isBrandUsername(profile.username)) return false;
 
-  // 2. Provjeri da li se barem jedna obavezna ključna reč pojavljuje
+  // 2. Odbaci ako bio sadrži blacklist reči (jasni signali da NIJE personalni trener)
+  for (const bw of BIO_BLACKLIST) {
+    if (combined.includes(bw)) return false;
+  }
+
+  // 3. Provjeri obavezne ključne reči — mora biti prisutna BAR JEDNA
   const hasRequired = nicheConfig.bioRequired.some(kw => combined.includes(kw));
 
-  // 3. Provjeri koliko bio keyword-a se poklapa
+  // 4. Provjeri broj poklapanja sa bio keywords
   const matchCount = nicheConfig.bioKeywords.filter(kw => combined.includes(kw)).length;
 
-  // Profil je relevantan ako ima obaveznu ključnu reč ILI barem 2 od bio keywords
+  // Za fitness/personal trainer nišu: obavezna reč je neophodna — ne smije proći samo na count
+  // Za ostale niše: 2+ match-a je dovoljno
+  if (nicheConfig.strictMode) {
+    return hasRequired; // striktni mod — samo obavezna reč
+  }
   return hasRequired || matchCount >= 2;
 }
 
-// ── Generiši search upite za datu nišu ──
+// ── TASK 3 & 2: Generiši search upite uključujući hashtag pretragu ──
 function buildIgSearchQueries(nicheConfig, niche, location, count) {
   const queries = [];
-  const terms = nicheConfig.searchTerms;
+  const terms   = nicheConfig.searchTerms;
+  const tags    = nicheConfig.hashtagTerms || [];
 
-  // Primarni upiti sa svakim terminom
-  for (const term of terms) {
+  // ── A) Direktna pretraga profila sa nišom ──
+  for (const term of terms.slice(0, 3)) {
     queries.push(`site:instagram.com "${term}" ${location}`);
   }
 
-  // Upiti sa link/forma filterima
-  queries.push(`site:instagram.com "${terms[0]}" ${location} typeform OR forms.gle OR jotform OR "link in bio"`);
-  queries.push(`site:instagram.com "${terms[0]}" ${location} linktr.ee OR bio.site OR beacons`);
+  // ── B) Pretraga sa link-in-bio signalima ──
+  queries.push(`site:instagram.com "${terms[0]}" ${location} "link in bio" OR linktr.ee OR typeform`);
 
-  // Upiti bez lokacije ako ima malo rezultata (šira mreža)
-  if (terms.length > 1) {
-    queries.push(`site:instagram.com "${terms[1]}" ${location} coaching OR online`);
+  // ── C) Hashtag stranice — Instagram explore/tags vraća profile koji su koristili tag ──
+  // SerpAPI može da indeksira instagram.com/explore/tags/ stranice
+  for (const tag of tags.slice(0, 4)) {
+    queries.push(`site:instagram.com/explore/tags "${tag}" ${location}`);
   }
 
-  // Slobodan niche termin bez navodnika za širi ulov
-  queries.push(`site:instagram.com ${niche} ${location} trainer OR coach OR trener`);
+  // ── D) Hashtag direktno u Google pretrazi ──
+  for (const tag of tags.slice(0, 3)) {
+    queries.push(`instagram.com "#${tag}" ${location} -site:facebook.com -site:twitter.com`);
+  }
+
+  // ── E) Šira pretraga bez navodnika za više rezultata ──
+  if (terms.length > 1) {
+    queries.push(`site:instagram.com ${terms[1]} ${location} -gym -teretana -centar -klub`);
+  }
+  queries.push(`site:instagram.com ${niche} ${location} personal -gym -studio -centar`);
 
   return queries;
 }
@@ -2007,6 +2067,36 @@ async function startIgSearch() {
 
         for (const r of data.organic_results || []) {
           const link = r.link || '';
+
+          // ── Hashtag stranica: izvuci @username iz snippeta/titlea ──
+          const isHashtagPage = link.includes('instagram.com/explore/tags/') || link.includes('instagram.com/p/');
+          if (isHashtagPage) {
+            // Iz hashtag stranica izvlačimo username-e koji se pominju u snippetu
+            const allText = extractAllText(r);
+            const mentionMatches = [...allText.matchAll(/@([a-zA-Z0-9_.]{3,30})/g)];
+            for (const mm of mentionMatches) {
+              const uname = mm[1].toLowerCase();
+              if (seen.has(uname)) continue;
+              if (['p','reel','explore','tags','stories','accounts','tv','_u','about','help'].includes(uname)) continue;
+              if (isBrandUsername(uname)) { skippedBrand++; seen.add(uname); continue; }
+              // Za hashtag rezultate koristimo username kao jedini signal — dodaj s pending bio
+              seen.add(uname);
+              profiles.push({
+                username: uname,
+                displayName: uname,
+                igUrl: `https://www.instagram.com/${uname}/`,
+                bio: r.snippet || '',
+                externalUrl: '', formUrl: '',
+                linktreeUrl: '', linktreeLinks: [],
+                category: 'neither',
+                nicheMatch: true,
+                fromHashtag: true,
+              });
+              if (profiles.length >= count) break;
+            }
+            continue; // preskoči normalnu obradu za hashtag stranicu
+          }
+
           if (!link.includes('instagram.com/')) continue;
 
           const match = link.match(/instagram\.com\/([^/?#]+)/);
@@ -2027,10 +2117,10 @@ async function startIgSearch() {
             .replace(/\d+[KkMmBb]?\s*(Followers|Following|Posts|likes?|comments?)[^·.\n]*/gi, '')
             .replace(/·/g, ' ').trim();
 
-          // ── FILTER 1: Brendirani username (npr. street.workout.serbia) ──
+          // ── FILTER 1: Brendirani username ──
           if (isBrandUsername(username)) {
             skippedBrand++;
-            seen.add(username.toLowerCase()); // ne vraćaj isti username
+            seen.add(username.toLowerCase());
             continue;
           }
 
@@ -2165,6 +2255,7 @@ function renderIgCards() {
       : p.category === 'link'
       ? `<span class="ig-tag ig-tag-link">🔗 Link</span>`
       : `<span class="ig-tag ig-tag-none">Bez linka</span>`;
+    const hashtagTag = p.fromHashtag ? `<span class="ig-tag" style="background:rgba(234,179,8,0.1);color:#fde047;border-color:rgba(234,179,8,0.25);"># Hashtag</span>` : '';
 
     // AI score badge
     const aiHtml = p.aiScore > 0
@@ -2199,7 +2290,7 @@ function renderIgCards() {
       </div>
       ${p.bio ? `<div class="ig-bio">${esc(p.bio)}</div>` : ''}
       ${aiReason}
-      <div class="ig-tags">${tagHtml}</div>
+      <div class="ig-tags">${tagHtml}${hashtagTag}</div>
       ${ltLinks}
       <div class="ig-links">
         <a class="ig-link-btn view" href="${esc(p.igUrl)}" target="_blank">👁 Profil</a>
