@@ -1874,39 +1874,76 @@ function buildIgSearchQueries(nicheConfig, niche, location, count) {
   const terms   = nicheConfig.searchTerms;
   const tags    = nicheConfig.hashtagTerms || [];
 
-  // ── A) Direktna pretraga profila — svaki search term posebno ──
+  // ── A) Direktna pretraga profila — svaki search term posebno, do 10 stranica ──
+  // Svaki upit nosi do 100 rezultata (10 poziva × 10 rezultata)
+  // Ne ograničavamo ovdje — paginacija se kontroliše u loopu
   for (const term of terms) {
-    queries.push(`site:instagram.com "${term}" ${location}`);
+    queries.push({ q: `site:instagram.com "${term}" ${location}`, maxPages: 10 });
   }
 
   // ── B) Varijante bez navodnika — širi ulov ──
-  queries.push(`site:instagram.com ${terms[0]} ${location} -gym -teretana -centar -studio -club`);
+  queries.push({ q: `site:instagram.com ${terms[0]} ${location} -gym -teretana -centar -studio -club`, maxPages: 5 });
   if (terms.length > 1) {
-    queries.push(`site:instagram.com ${terms[1]} ${location} -gym -teretana -centar -studio`);
+    queries.push({ q: `site:instagram.com ${terms[1]} ${location} -gym -teretana -centar`, maxPages: 5 });
   }
 
-  // ── C) Hashtag upiti — Google indeksira IG posts sa tagovima ──
-  // Koristimo hashtag kao search term na instagram.com (ne explore/tags koji ne radi)
-  for (const tag of tags.slice(0, 5)) {
-    queries.push(`site:instagram.com "#${tag}" ${location}`);
+  // ── C) Hashtag upiti — s lokacijom ──
+  for (const tag of tags.slice(0, 6)) {
+    queries.push({ q: `site:instagram.com "#${tag}" ${location}`, maxPages: 3 });
   }
 
-  // ── D) Hashtag bez location za više rezultata ──
-  for (const tag of tags.slice(0, 3)) {
-    queries.push(`site:instagram.com "#${tag}"`);
+  // ── D) Hashtag bez lokacije za više rezultata ──
+  for (const tag of tags.slice(0, 4)) {
+    queries.push({ q: `site:instagram.com "#${tag}"`, maxPages: 3 });
   }
 
-  // ── E) Pretraga sa ključnim riječima iz bio-a koje imaju treneri ──
+  // ── E) Bio fraze koje treneri koriste ──
   const bioHints = ['online trening', 'online coaching', 'transformacija tela', 'gubljenje kilograma', 'personalni trening'];
-  for (const hint of bioHints.slice(0, 3)) {
-    queries.push(`site:instagram.com "${hint}" ${location}`);
+  for (const hint of bioHints) {
+    queries.push({ q: `site:instagram.com "${hint}" ${location}`, maxPages: 3 });
   }
 
-  // ── F) Pretraga sa "PT" skraćenicom ──
-  queries.push(`site:instagram.com "PT" trener ${location}`);
-  queries.push(`site:instagram.com "certified trainer" ${location}`);
+  // ── F) PT i certifikovani treneri ──
+  queries.push({ q: `site:instagram.com "PT" trener ${location}`, maxPages: 3 });
+  queries.push({ q: `site:instagram.com "certified trainer" ${location}`, maxPages: 3 });
 
   return queries;
+}
+
+// ── Fetch linka profila koristeći SerpAPI (pouzdano, ne blokira) ──
+// Zovemo Google za "site:instagram.com/username" i čitamo rich_snippet/sitelinks
+async function fetchIgLinkViaSerpApi(username) {
+  if (igFetchCache.has(username)) return igFetchCache.get(username);
+  try {
+    const data = await keyedFetch('serpapi', SERPAPI_BASE,
+      key => new URLSearchParams({
+        engine: 'google',
+        q: `site:instagram.com/${username}`,
+        num: '3',
+        api_key: key
+      })
+    );
+    const results = data.organic_results || [];
+    for (const r of results) {
+      const allText = [
+        r.snippet || '',
+        JSON.stringify(r.rich_snippet || {}),
+        JSON.stringify(r.knowledge_graph || {}),
+        (r.rich_snippet?.top?.extensions || []).join(' '),
+        (r.rich_snippet?.bottom?.extensions || []).join(' '),
+        JSON.stringify(r.sitelinks || {}),
+      ].join(' ');
+      const link = detectLink(allText) || detectForm(allText);
+      if (link) {
+        igFetchCache.set(username, link);
+        return link;
+      }
+    }
+    igFetchCache.set(username, null);
+    return null;
+  } catch(_) {
+    return undefined; // API greška — ne znamo
+  }
 }
 
 // Niche chip selection
@@ -1972,67 +2009,6 @@ function classifyProfile(profile) {
   return 'neither';
 }
 
-// Fetch Linktree page and extract links
-async function fetchLinktreeLinks(ltUrl) {
-  try {
-    const resp = await fetch(CORS_PROXY + encodeURIComponent(ltUrl), { signal: AbortSignal.timeout(8000) });
-    if (!resp.ok) return [];
-    const html = await resp.text();
-    const matches = [...html.matchAll(/href="(https?:\/\/[^"]+)"/gi)];
-    const links = [...new Set(
-      matches.map(m => m[1])
-        .filter(u => !u.includes('instagram.com') && !u.includes('linktr.ee') && !u.includes('facebook.com/tr'))
-    )];
-    return links.slice(0, 10);
-  } catch(_) { return []; }
-}
-
-// ── Fetch stvarnog Instagram profila i izvuci bio link ──
-// Instagram vraća JSON sa __additionalDataLoaded ili window._sharedData
-async function fetchIgProfileLink(username) {
-  const PROXIES = [
-    'https://corsproxy.io/?url=',
-    'https://api.allorigins.win/raw?url=',
-  ];
-  for (const proxy of PROXIES) {
-    try {
-      const url  = `https://www.instagram.com/${username}/`;
-      const resp = await fetch(proxy + encodeURIComponent(url), {
-        signal: AbortSignal.timeout(7000),
-        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' }
-      });
-      if (!resp.ok) continue;
-      const html = await resp.text();
-
-      // Metod 1: window._sharedData JSON
-      const sharedMatch = html.match(/"external_url"\s*:\s*"([^"]+)"/);
-      if (sharedMatch) {
-        const raw = sharedMatch[1].replace(/\\u0026/g,'&').replace(/\\\//g,'/');
-        if (raw && raw !== 'null') return raw;
-      }
-
-      // Metod 2: og:description meta tag koji ponekad sadrži link
-      const bioMatch = html.match(/<meta\s+[^>]*property="og:description"[^>]*content="([^"]+)"/i)
-                    || html.match(/content="([^"]*https?:\/\/[^"]+)"[^>]*property="og:description"/i);
-      if (bioMatch) {
-        const desc = bioMatch[1];
-        const urlInDesc = desc.match(/https?:\/\/[^\s"<>]+/);
-        if (urlInDesc && !urlInDesc[0].includes('instagram.com')) return urlInDesc[0];
-      }
-
-      // Metod 3: tražimo "biography":"..." + "external_url":"..."
-      const extMatch = html.match(/"external_url":"([^"]+)"/);
-      if (extMatch && extMatch[1] && extMatch[1] !== 'null' && extMatch[1] !== '') {
-        return extMatch[1].replace(/\\u0026/g,'&').replace(/\\\//g,'/');
-      }
-
-      // Pronašli smo HTML ali nema linka — znači profil stvarno nema link
-      return null;
-    } catch(_) { continue; }
-  }
-  return undefined; // undefined = nismo mogli fetchovati (ne znamo)
-}
-
 // Cache za fetchovane profile (da ne fetchujemo isti profil dva puta)
 const igFetchCache = new Map();
 
@@ -2089,217 +2065,224 @@ async function startIgSearch() {
   const [gl, hl]   = countryVal.split('|');
   const countryNames = {'rs':'Serbia','hr':'Croatia','ba':'Bosnia','si':'Slovenia','me':'Montenegro','us':'USA','gb':'UK','de':'Germany','au':'Australia','ca':'Canada'};
   const countryName  = countryNames[gl] || gl;
-  const city     = $('ig-city').value.trim();
-  const location = city ? `${city}, ${countryName}` : countryName;
-  const count    = parseInt($('ig-count').value);
+  const city       = $('ig-city').value.trim();
+  const location   = city ? `${city}, ${countryName}` : countryName;
+  const count      = parseInt($('ig-count').value);
   const onlyNoLink = $('ig-only-no-link').checked;
 
   if (!niche) { igShowAlert('⚠️ Unesi nišu.', 'warning'); return; }
 
-  // Uzmi niche config za filtriranje
   const nicheConfig = getNicheConfig(niche);
 
   igClearAlert();
   igData = [];
+  igFetchCache.clear(); // resetuj cache za novu pretragu
   $('ig-results-section').style.display = 'none';
   $('ig-search-btn').disabled = true;
   $('ig-status-box').style.display = 'block';
   igSetProgress(0, 'Pretražujem Instagram profile...');
 
   try {
-    const profiles  = [];
-    const seen      = new Set([...savedIgUsernames]);
-    let skippedBrand = 0;
-    let skippedIrrelevant = 0;
+    const profiles     = [];
+    // VAŽNO: seen ne uključuje savedIgUsernames — ne preskačemo prethodno sačuvane
+    // jer korisnik može htjeti da ih ponovo vidi u novoj pretrazi
+    const seen         = new Set();
+    let skippedBrand   = 0;
+    let skippedNoNiche = 0;
+    let skippedLink    = 0;
+    let totalApiCalls  = 0;
 
-    // Generiši specifične upite za ovu nišu
-    const queries = buildIgSearchQueries(nicheConfig, niche, location, count);
-    let pagesDone = 0;
-    const totalSteps = queries.length * 2;
+    const queries   = buildIgSearchQueries(nicheConfig, niche, location, count);
+    let queryIndex  = 0;
 
-    for (const q of queries) {
+    // ── FAZA 1: Skupljamo kandidate (bez link-fetcha) ──
+    // Nastavljamo dok ne skupimo count kandidata ili ne iscrpimo sve upite
+    for (const { q, maxPages } of queries) {
       if (profiles.length >= count) break;
-      for (let start = 0; start < 20; start += 10) {
+
+      let foundOnAnyPage = false;
+
+      for (let start = 0; start < maxPages * 10; start += 10) {
         if (profiles.length >= count) break;
-        const progress = pagesDone / totalSteps;
-        igSetProgress(progress, `🔍 Pretraga: ${profiles.length} pronađenih, ${skippedBrand + skippedIrrelevant} filtriranih · ${sessionStats.serpapi.calls} API poziva`);
+
+        const progress = (queryIndex / queries.length) + (start / (maxPages * 10)) / queries.length;
+        igSetProgress(progress * 0.7, // rezervišemo 30% progresa za fazu 2 (link fetch)
+          `🔍 Upit ${queryIndex + 1}/${queries.length} | str.${start/10 + 1}/${maxPages} | ${profiles.length} pronađenih | ${skippedBrand + skippedNoNiche} filtriranih | ${totalApiCalls} API poziva`
+        );
         showTokenCounter('ig-token-counter', 'serpapi');
 
-        const data = await keyedFetch('serpapi', SERPAPI_BASE,
-          key => new URLSearchParams({ engine:'google', q, num:'10', start:String(start), api_key:key, gl, hl })
-        );
+        let data;
+        try {
+          data = await keyedFetch('serpapi', SERPAPI_BASE,
+            key => new URLSearchParams({ engine: 'google', q, num: '10', start: String(start), api_key: key, gl, hl })
+          );
+          totalApiCalls++;
+        } catch(e) {
+          // Ključ iscrpljen ili mrežna greška — preskoči na sljedeći upit
+          break;
+        }
+
         if (data.error && !/credits|limit|quota|exceeded|insufficient/i.test(data.error))
           throw new Error('SerpAPI: ' + data.error);
 
-        for (const r of data.organic_results || []) {
+        const organicResults = data.organic_results || [];
+        if (!organicResults.length) break; // nema više rezultata za ovaj upit
+
+        let foundOnThisPage = 0;
+
+        for (const r of organicResults) {
           const link = r.link || '';
 
-          // ── Hashtag stranica: izvuci @username iz snippeta/titlea ──
-          const isHashtagPage = link.includes('instagram.com/explore/tags/') || link.includes('instagram.com/p/');
-          if (isHashtagPage) {
-            // Iz hashtag stranica izvlačimo username-e koji se pominju u snippetu
+          // ── Hashtag/post stranica: izvuci @username iz teksta ──
+          if (link.includes('/explore/tags/') || link.includes('instagram.com/p/')) {
             const allText = extractAllText(r);
-            const mentionMatches = [...allText.matchAll(/@([a-zA-Z0-9_.]{3,30})/g)];
-            for (const mm of mentionMatches) {
+            const mentions = [...allText.matchAll(/@([a-zA-Z0-9_.]{3,30})/g)];
+            for (const mm of mentions) {
               const uname = mm[1].toLowerCase();
               if (seen.has(uname)) continue;
-              if (['p','reel','explore','tags','stories','accounts','tv','_u','about','help'].includes(uname)) continue;
+              if (['p','reel','explore','tags','stories','accounts','tv','_u','about','help','reels'].includes(uname)) continue;
               if (isBrandUsername(uname)) { skippedBrand++; seen.add(uname); continue; }
-              // Za hashtag rezultate koristimo username kao jedini signal — dodaj s pending bio
               seen.add(uname);
+              foundOnThisPage++;
+              foundOnAnyPage = true;
               profiles.push({
-                username: uname,
-                displayName: uname,
+                username: uname, displayName: uname,
                 igUrl: `https://www.instagram.com/${uname}/`,
-                bio: r.snippet || '',
-                externalUrl: '', formUrl: '',
+                bio: '', externalUrl: '', formUrl: '',
                 linktreeUrl: '', linktreeLinks: [],
-                category: 'neither',
-                nicheMatch: true,
-                fromHashtag: true,
+                category: 'pending', // bit će određeno u fazi 2
+                nicheMatch: true, fromHashtag: true,
               });
               if (profiles.length >= count) break;
             }
-            continue; // preskoči normalnu obradu za hashtag stranicu
+            continue;
           }
 
           if (!link.includes('instagram.com/')) continue;
-
           const match = link.match(/instagram\.com\/([^/?#]+)/);
           if (!match) continue;
-          const username = match[1];
+          const username = match[1].toLowerCase();
 
-          // Preskoči sistemske IG stranice
-          if (['p','reel','explore','tags','stories','accounts','tv','_u','about','help'].includes(username)) continue;
-          // Preskoči već viđene
-          if (seen.has(username.toLowerCase())) continue;
+          // Preskoči sistemske stranice
+          if (['p','reel','explore','tags','stories','accounts','tv','_u','about','help','reels','shop'].includes(username)) continue;
+          if (seen.has(username)) continue;
 
           const allText    = extractAllText(r);
           const snippet    = r.snippet || '';
           const title      = r.title   || '';
           const displayName = title.replace(/\s*\(@?[^)]*\)/,'').replace(/\s*[·\-|].*$/,'').trim() || username;
-
           const bio = snippet
             .replace(/\d+[KkMmBb]?\s*(Followers|Following|Posts|likes?|comments?)[^·.\n]*/gi, '')
             .replace(/·/g, ' ').trim();
 
-          // ── FILTER 1: Brendirani username ──
-          if (isBrandUsername(username)) {
-            skippedBrand++;
-            seen.add(username.toLowerCase());
-            continue;
-          }
+          // Filter 1: brend username
+          if (isBrandUsername(username)) { skippedBrand++; seen.add(username); continue; }
 
-          // ── FILTER 2: Relevantnost prema niši ──
+          // Filter 2: relevantnost niše (na osnovu snippeta)
           const profileDraft = { username, displayName, bio };
-          if (!isProfileRelevant(profileDraft, nicheConfig)) {
-            skippedIrrelevant++;
-            seen.add(username.toLowerCase());
-            continue;
-          }
+          if (!isProfileRelevant(profileDraft, nicheConfig)) { skippedNoNiche++; seen.add(username); continue; }
 
-          seen.add(username.toLowerCase());
+          seen.add(username);
+          foundOnThisPage++;
+          foundOnAnyPage = true;
 
-          // ── Fetch stvarnog IG profila da dobijemo tačan link ──
-          igSetProgress(progress, `🔍 Provjeravam @${username}... (${profiles.length} pronađenih)`);
-          let realLink = undefined;
-          if (!igFetchCache.has(username)) {
-            realLink = await fetchIgProfileLink(username);
-            igFetchCache.set(username, realLink);
-          } else {
-            realLink = igFetchCache.get(username);
-          }
+          // Izvuci link iz Google snippeta (Faza 1 — može biti netačno, poboljšavamo u Fazi 2)
+          const snippetLink = detectForm(allText) || detectLink(allText);
 
-          // realLink: string = ima link, null = nema linka, undefined = nije fetchovano
-          const snippetFormUrl = detectForm(allText);
-          const snippetExtUrl  = detectLink(allText);
-          // Kombinujemo: pravi link ako ga imamo, inače snippet
-          const finalExtUrl = (realLink !== undefined && realLink !== null)
-            ? realLink
-            : (snippetExtUrl || '');
-          const finalFormUrl = detectForm(finalExtUrl) || snippetFormUrl;
-
-          // ── FILTER 3: Samo bez linka — koristimo PRAVI link ──
-          if (onlyNoLink) {
-            const hasRealLink = realLink !== undefined
-              ? (realLink !== null)        // znamo tačno
-              : !!(snippetExtUrl || snippetFormUrl); // fallback na snippet
-            if (hasRealLink) { skippedIrrelevant++; continue; }
-          }
-
-          // Ako je linktr.ee — fetch linkovi iz Linktree stranice
-          let linktreeLinks = [];
-          if (/linktr\.ee/i.test(finalExtUrl)) {
-            igSetProgress(progress, `🌳 Otvaram Linktree za @${username}...`);
-            linktreeLinks = await fetchLinktreeLinks(finalExtUrl);
-            const ltText  = linktreeLinks.join(' ');
-            const ltForm  = detectForm(ltText);
-            const ltLink  = detectLink(ltText);
-            const enriched = ltForm || ltLink || finalExtUrl;
-            if (onlyNoLink && enriched) { skippedIrrelevant++; continue; }
-            profiles.push({
-              username, displayName,
-              igUrl: `https://www.instagram.com/${username}/`,
-              bio,
-              externalUrl: enriched,
-              formUrl: ltForm || finalFormUrl,
-              linktreeUrl: finalExtUrl,
-              linktreeLinks,
-              category: classifyProfile({ externalUrl: enriched, formUrl: ltForm || finalFormUrl }),
-              nicheMatch: true,
-            });
-          } else {
-            profiles.push({
-              username, displayName,
-              igUrl: `https://www.instagram.com/${username}/`,
-              bio,
-              externalUrl: finalExtUrl,
-              formUrl: finalFormUrl,
-              linktreeUrl: '', linktreeLinks: [],
-              category: classifyProfile({ externalUrl: finalExtUrl, formUrl: finalFormUrl }),
-              nicheMatch: true,
-            });
-          }
+          profiles.push({
+            username, displayName,
+            igUrl: `https://www.instagram.com/${username}/`,
+            bio,
+            externalUrl: snippetLink,
+            formUrl: detectForm(snippetLink),
+            linktreeUrl: '', linktreeLinks: [],
+            category: 'pending', // određujemo u fazi 2
+            nicheMatch: true,
+          });
 
           if (profiles.length >= count) break;
         }
-        pagesDone++;
-        // Nastavi na drugu stranicu samo ako je prva imala bar 1 IG link
-        const igLinksOnPage = (data.organic_results || []).filter(r =>
-          r.link?.includes('instagram.com/') && !r.link.includes('/explore/') && !r.link.includes('/p/')
-        ).length;
-        if (start === 0 && igLinksOnPage === 0) break; // 0 profila na prvoj str → preskoči drugu
-        await sleep(350);
+
+        // Ako ni jedna stranica u ovom upitu nije dala rezultata — idi na sljedeći upit
+        if (start === 0 && !foundOnThisPage) break;
+        await sleep(300);
       }
+
+      queryIndex++;
     }
 
-    igData = profiles;
+    // ── FAZA 2: Link detekcija za sve prikupljene profile ──
+    // Za svaki profil pozivamo SerpAPI jednom da dobijemo tačan link
+    // Ovo radimo NAKON što smo skupili sve kandidate — ne usporava fazu 1
+    igSetProgress(0.7, `🔗 Provjeravam linkove za ${profiles.length} profila...`);
+
+    for (let i = 0; i < profiles.length; i++) {
+      const p = profiles[i];
+      if (p.fromHashtag || p.externalUrl) {
+        // Za hashtag profile i one koji već imaju link — preskočimo API poziv
+        if (!p.externalUrl) {
+          p.category = 'neither';
+        } else {
+          p.formUrl = detectForm(p.externalUrl);
+          p.category = classifyProfile(p);
+        }
+        continue;
+      }
+
+      igSetProgress(0.7 + (i / profiles.length) * 0.3,
+        `🔗 ${i + 1}/${profiles.length}: @${p.username} · ${totalApiCalls} API poziva`
+      );
+
+      const realLink = await fetchIgLinkViaSerpApi(p.username);
+      totalApiCalls++;
+
+      if (realLink) {
+        p.externalUrl = realLink;
+        p.formUrl     = detectForm(realLink);
+        // Provjeri Linktree
+        if (/linktr\.ee/i.test(realLink)) {
+          p.linktreeUrl = realLink;
+          // Linktree sadržaj nećemo fetchovati (blokiran) — samo bilježimo URL
+        }
+      }
+      p.category = classifyProfile(p);
+      await sleep(200);
+    }
+
+    // ── FAZA 3: Primijeni onlyNoLink filter NAKON što znamo tačne linkove ──
+    let finalProfiles = profiles;
+    if (onlyNoLink) {
+      finalProfiles = profiles.filter(p => {
+        if (p.externalUrl || p.formUrl) { skippedLink++; return false; }
+        return true;
+      });
+    }
+
+    igData = finalProfiles;
     $('ig-status-box').style.display = 'none';
 
     if (!igData.length) {
-      const skipMsg = skippedBrand + skippedIrrelevant > 0
-        ? ` (${skippedBrand} brendiranih + ${skippedIrrelevant} irelevantnih preskočeno)`
-        : '';
-      igShowAlert(`ℹ️ Nijedan relevantan profil nije pronađen${skipMsg}. Probaj drugu nišu, grad ili državu.`, 'info');
+      const detail = `(${skippedBrand} brendiranih, ${skippedNoNiche} nerelevantnih, ${skippedLink} sa linkom preskočeno)`;
+      igShowAlert(`ℹ️ Nijedan profil nije pronađen ${detail}. Probaj drugu nišu, grad ili povećaj limit.`, 'info');
       $('ig-search-btn').disabled = false;
       return;
     }
 
-    // Prikaži info o filtriranju
-    if (skippedBrand + skippedIrrelevant > 0) {
-      igShowAlert(`✅ Filtrirano: ${skippedBrand} brendiranih profila + ${skippedIrrelevant} irelevantnih preskočeno. Prikazujem ${igData.length} relevantnih personalnih profila.`, 'success');
-    }
+    igShowAlert(
+      `✅ Pronađeno ${igData.length} profila uz ${totalApiCalls} API poziva. ` +
+      `Preskočeno: ${skippedBrand} brendiranih, ${skippedNoNiche} nerelevantnih${onlyNoLink ? `, ${skippedLink} sa linkom` : ''}.`,
+      'success'
+    );
 
     // AI scoring (opciono)
     if ($('use-ai-scoring').checked) {
       const aiSvc = selectedAiModel;
       if (!getActiveKey(aiSvc)) {
-        igShowAlert(`⚠️ AI ocenjivanje uključeno ali nema ${aiSvc === 'gemini' ? 'Gemini' : 'OpenRouter'} ključa. Dodaj ga u 🔑 API Ključevi.`, 'warning');
+        igShowAlert(`⚠️ AI ocenjivanje uključeno ali nema ${aiSvc === 'gemini' ? 'Gemini' : 'OpenRouter'} ključa.`, 'warning');
       } else {
         $('ig-status-box').style.display = 'block';
         igData = await runAIScoring(igData, niche, countryName);
         $('ig-status-box').style.display = 'none';
-        // Ukloni AI-ocijenjene profile s ocjenom < 3 (potpuno irelevantni)
         const before = igData.length;
         igData = igData.filter(p => !p.aiScore || p.aiScore >= 3);
         const removedByAI = before - igData.length;
@@ -2309,9 +2292,7 @@ async function startIgSearch() {
           $('igm-ai-avg').textContent = avg;
           $('igm-ai-card').style.display = 'block';
         }
-        if (removedByAI > 0) {
-          igShowAlert(`🤖 AI je uklonio ${removedByAI} irelevantnih profila (ocena < 3). Ostalo: ${igData.length} profila.`, 'info');
-        }
+        if (removedByAI > 0) igShowAlert(`🤖 AI uklonio ${removedByAI} irelevantnih. Ostalo: ${igData.length}.`, 'info');
       }
     }
 
