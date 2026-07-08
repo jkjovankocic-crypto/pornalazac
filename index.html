@@ -1978,7 +1978,6 @@ async function fetchLinktreeLinks(ltUrl) {
     const resp = await fetch(CORS_PROXY + encodeURIComponent(ltUrl), { signal: AbortSignal.timeout(8000) });
     if (!resp.ok) return [];
     const html = await resp.text();
-    // Extract all href links from Linktree HTML
     const matches = [...html.matchAll(/href="(https?:\/\/[^"]+)"/gi)];
     const links = [...new Set(
       matches.map(m => m[1])
@@ -1987,6 +1986,55 @@ async function fetchLinktreeLinks(ltUrl) {
     return links.slice(0, 10);
   } catch(_) { return []; }
 }
+
+// ── Fetch stvarnog Instagram profila i izvuci bio link ──
+// Instagram vraća JSON sa __additionalDataLoaded ili window._sharedData
+async function fetchIgProfileLink(username) {
+  const PROXIES = [
+    'https://corsproxy.io/?url=',
+    'https://api.allorigins.win/raw?url=',
+  ];
+  for (const proxy of PROXIES) {
+    try {
+      const url  = `https://www.instagram.com/${username}/`;
+      const resp = await fetch(proxy + encodeURIComponent(url), {
+        signal: AbortSignal.timeout(7000),
+        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' }
+      });
+      if (!resp.ok) continue;
+      const html = await resp.text();
+
+      // Metod 1: window._sharedData JSON
+      const sharedMatch = html.match(/"external_url"\s*:\s*"([^"]+)"/);
+      if (sharedMatch) {
+        const raw = sharedMatch[1].replace(/\\u0026/g,'&').replace(/\\\//g,'/');
+        if (raw && raw !== 'null') return raw;
+      }
+
+      // Metod 2: og:description meta tag koji ponekad sadrži link
+      const bioMatch = html.match(/<meta\s+[^>]*property="og:description"[^>]*content="([^"]+)"/i)
+                    || html.match(/content="([^"]*https?:\/\/[^"]+)"[^>]*property="og:description"/i);
+      if (bioMatch) {
+        const desc = bioMatch[1];
+        const urlInDesc = desc.match(/https?:\/\/[^\s"<>]+/);
+        if (urlInDesc && !urlInDesc[0].includes('instagram.com')) return urlInDesc[0];
+      }
+
+      // Metod 3: tražimo "biography":"..." + "external_url":"..."
+      const extMatch = html.match(/"external_url":"([^"]+)"/);
+      if (extMatch && extMatch[1] && extMatch[1] !== 'null' && extMatch[1] !== '') {
+        return extMatch[1].replace(/\\u0026/g,'&').replace(/\\\//g,'/');
+      }
+
+      // Pronašli smo HTML ali nema linka — znači profil stvarno nema link
+      return null;
+    } catch(_) { continue; }
+  }
+  return undefined; // undefined = nismo mogli fetchovati (ne znamo)
+}
+
+// Cache za fetchovane profile (da ne fetchujemo isti profil dva puta)
+const igFetchCache = new Map();
 
 // ── Saved profiles (localStorage) ──
 let savedIgUsernames = new Set(JSON.parse(localStorage.getItem('ig_saved_usernames') || '[]'));
@@ -2152,52 +2200,65 @@ async function startIgSearch() {
 
           seen.add(username.toLowerCase());
 
-          const formUrl     = detectForm(allText);
-          const externalUrl = formUrl || detectLink(allText);
-          const category    = classifyProfile({ externalUrl, formUrl });
-
-          // ── FILTER 3: Samo bez linka (ako je checkbox uključen) ──
-          if (onlyNoLink && (externalUrl || formUrl)) {
-            skippedIrrelevant++;
-            continue;
+          // ── Fetch stvarnog IG profila da dobijemo tačan link ──
+          igSetProgress(progress, `🔍 Provjeravam @${username}... (${profiles.length} pronađenih)`);
+          let realLink = undefined;
+          if (!igFetchCache.has(username)) {
+            realLink = await fetchIgProfileLink(username);
+            igFetchCache.set(username, realLink);
+          } else {
+            realLink = igFetchCache.get(username);
           }
 
-          // Ako je linktr.ee — fetch linkovi
+          // realLink: string = ima link, null = nema linka, undefined = nije fetchovano
+          const snippetFormUrl = detectForm(allText);
+          const snippetExtUrl  = detectLink(allText);
+          // Kombinujemo: pravi link ako ga imamo, inače snippet
+          const finalExtUrl = (realLink !== undefined && realLink !== null)
+            ? realLink
+            : (snippetExtUrl || '');
+          const finalFormUrl = detectForm(finalExtUrl) || snippetFormUrl;
+
+          // ── FILTER 3: Samo bez linka — koristimo PRAVI link ──
+          if (onlyNoLink) {
+            const hasRealLink = realLink !== undefined
+              ? (realLink !== null)        // znamo tačno
+              : !!(snippetExtUrl || snippetFormUrl); // fallback na snippet
+            if (hasRealLink) { skippedIrrelevant++; continue; }
+          }
+
+          // Ako je linktr.ee — fetch linkovi iz Linktree stranice
           let linktreeLinks = [];
-          if (/linktr\.ee/i.test(externalUrl)) {
+          if (/linktr\.ee/i.test(finalExtUrl)) {
             igSetProgress(progress, `🌳 Otvaram Linktree za @${username}...`);
-            linktreeLinks = await fetchLinktreeLinks(externalUrl);
+            linktreeLinks = await fetchLinktreeLinks(finalExtUrl);
             const ltText  = linktreeLinks.join(' ');
             const ltForm  = detectForm(ltText);
             const ltLink  = detectLink(ltText);
-            const enriched = ltForm || ltLink || externalUrl;
-            // Ako onlyNoLink i linktree ima link — preskoči
+            const enriched = ltForm || ltLink || finalExtUrl;
             if (onlyNoLink && enriched) { skippedIrrelevant++; continue; }
             profiles.push({
               username, displayName,
               igUrl: `https://www.instagram.com/${username}/`,
               bio,
               externalUrl: enriched,
-              formUrl: ltForm || formUrl,
-              linktreeUrl: externalUrl,
+              formUrl: ltForm || finalFormUrl,
+              linktreeUrl: finalExtUrl,
               linktreeLinks,
-              category: classifyProfile({ externalUrl: enriched, formUrl: ltForm || formUrl }),
+              category: classifyProfile({ externalUrl: enriched, formUrl: ltForm || finalFormUrl }),
               nicheMatch: true,
             });
           } else {
-            // ── onlyNoLink filter za profile bez linktree ──
-            if (onlyNoLink && externalUrl) {
-              // već preskočen gore, ovo je fallback — ne treba ništa
-            } else {
-              profiles.push({
-                username, displayName,
-                igUrl: `https://www.instagram.com/${username}/`,
-                bio, externalUrl, formUrl,
-                linktreeUrl: '', linktreeLinks: [],
-                category: classifyProfile({ externalUrl, formUrl }),
-                nicheMatch: true,
-              });
-            }
+            profiles.push({
+              username, displayName,
+              igUrl: `https://www.instagram.com/${username}/`,
+              bio,
+              externalUrl: finalExtUrl,
+              formUrl: finalFormUrl,
+              linktreeUrl: '', linktreeLinks: [],
+              category: classifyProfile({ externalUrl: finalExtUrl, formUrl: finalFormUrl }),
+              nicheMatch: true,
+            });
           }
 
           if (profiles.length >= count) break;
