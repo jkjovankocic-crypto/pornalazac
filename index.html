@@ -1907,6 +1907,39 @@ function buildIgSearchQueries(nicheConfig, niche, location, count) {
   queries.push({ q: `site:instagram.com "PT" trener ${location}`, maxPages: 3 });
   queries.push({ q: `site:instagram.com "certified trainer" ${location}`, maxPages: 3 });
 
+  // ── G) DM signal fraze — profili koji primaju klijente direktno bez sajta ──
+  // Ovo su idealni leadovi: nemaju sajt, sve vode kroz Instagram DM
+  const dmPhrases = [
+    'DM za početak',
+    'DM za pocetak',
+    'pošalji DM',
+    'posalji DM',
+    'piši u DM',
+    'pisi u DM',
+    'DM za prijavu',
+    'DM za informacije',
+    'DM za info',
+    'slobodna mesta DM',
+    'slobodna mjesta DM',
+    'prijava u DM',
+    'kontaktiraj DM',
+    'DM za saradnju',
+    'upišite se DM',
+    'upisite se DM',
+    'poruka za start',
+    'inbox za start',
+    'inbox za početak',
+  ];
+  for (const phrase of dmPhrases) {
+    // Tražimo kombinaciju niše + DM fraze na IG
+    queries.push({ q: `site:instagram.com "${phrase}" ${terms[0]}`, maxPages: 3 });
+  }
+  // Šira DM pretraga sa lokacijom
+  queries.push({ q: `site:instagram.com "DM za" trener ${location}`, maxPages: 5 });
+  queries.push({ q: `site:instagram.com "piši u DM" trener ${location}`, maxPages: 3 });
+  queries.push({ q: `site:instagram.com "inbox za" trener ${location}`, maxPages: 3 });
+  queries.push({ q: `site:instagram.com "DM za" fitness ${location}`, maxPages: 5 });
+
   return queries;
 }
 
@@ -2189,6 +2222,16 @@ async function startIgSearch() {
           // Izvuci link iz Google snippeta (Faza 1 — može biti netačno, poboljšavamo u Fazi 2)
           const snippetLink = detectForm(allText) || detectLink(allText);
 
+          // Detektuj DM signal fraze u bio/snippet tekstu
+          const DM_SIGNALS = [
+            'dm za', 'piši u dm', 'pisi u dm', 'pošalji dm', 'posalji dm',
+            'inbox za', 'prijava u dm', 'kontaktiraj dm', 'poruka za start',
+            'upiši se dm', 'upisi se dm', 'slobodna mesta dm', 'slobodna mjesta dm',
+            'dm me', 'send dm', 'message me', 'poruka za info',
+          ];
+          const bioLower = bio.toLowerCase();
+          const hasDmSignal = DM_SIGNALS.some(s => bioLower.includes(s));
+
           profiles.push({
             username, displayName,
             igUrl: `https://www.instagram.com/${username}/`,
@@ -2198,6 +2241,7 @@ async function startIgSearch() {
             linktreeUrl: '', linktreeLinks: [],
             category: 'pending', // određujemo u fazi 2
             nicheMatch: true,
+            hasDmSignal,
           });
 
           if (profiles.length >= count) break;
@@ -2257,6 +2301,13 @@ async function startIgSearch() {
         return true;
       });
     }
+
+    // ── FAZA 4: Sortiranje — DM signal profili dolaze prvi, zatim bez linka, pa ostali ──
+    finalProfiles.sort((a, b) => {
+      const scoreA = (a.hasDmSignal ? 10 : 0) + (a.category === 'neither' ? 3 : 0);
+      const scoreB = (b.hasDmSignal ? 10 : 0) + (b.category === 'neither' ? 3 : 0);
+      return scoreB - scoreA;
+    });
 
     igData = finalProfiles;
     $('ig-status-box').style.display = 'none';
@@ -2333,6 +2384,7 @@ function renderIgCards() {
       ? `<span class="ig-tag ig-tag-link">🔗 Link</span>`
       : `<span class="ig-tag ig-tag-none">Bez linka</span>`;
     const hashtagTag = p.fromHashtag ? `<span class="ig-tag" style="background:rgba(234,179,8,0.1);color:#fde047;border-color:rgba(234,179,8,0.25);"># Hashtag</span>` : '';
+    const dmTag = p.hasDmSignal ? `<span class="ig-tag" style="background:rgba(34,197,94,0.1);color:#86efac;border-color:rgba(34,197,94,0.3);">💬 DM signal</span>` : '';
 
     // AI score badge
     const aiHtml = p.aiScore > 0
@@ -2367,7 +2419,7 @@ function renderIgCards() {
       </div>
       ${p.bio ? `<div class="ig-bio">${esc(p.bio)}</div>` : ''}
       ${aiReason}
-      <div class="ig-tags">${tagHtml}${hashtagTag}</div>
+      <div class="ig-tags">${tagHtml}${hashtagTag}${dmTag}</div>
       ${ltLinks}
       <div class="ig-links">
         <a class="ig-link-btn view" href="${esc(p.igUrl)}" target="_blank">👁 Profil</a>
